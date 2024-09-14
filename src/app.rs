@@ -1,3 +1,6 @@
+use std::time::{Duration};
+
+use instant::Instant;
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
@@ -17,15 +20,18 @@ pub async fn run() {
 
 struct App<'a> {
     window: &'a Window,
-    renderer: Renderer<'a>
+    renderer: Renderer<'a>,
+    last_update: Instant
 }
 
 impl<'a> App<'a> {
     pub async fn new(window: &'a Window) -> Self {
         let renderer = Renderer::new(window).await;
+        let last_update = Instant::now();
         Self {
             window,
-            renderer
+            renderer,
+            last_update
         }
     }
 
@@ -71,6 +77,12 @@ impl<'a> App<'a> {
     fn render(&mut self) {
         pollster::block_on(async move {
             let _ = self.renderer.render().await;
+            if self.last_update.elapsed() > Duration::from_secs(1) {
+                let fps = self.renderer.get_fps();
+                self.window.set_title(&format!("Fps: {}", fps));
+                self.last_update = Instant::now();
+            }
+            self.window.request_redraw();
         });
     }
 

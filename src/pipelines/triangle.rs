@@ -6,7 +6,7 @@ impl TrianglePipeline {
     pub fn new(surface_config: &wgpu::SurfaceConfiguration, device: &wgpu::Device) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("triangle.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/triangle.wgsl").into()),
         });
 
         let render_pipeline_layout =

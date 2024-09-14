@@ -2,7 +2,7 @@ use std::iter;
 
 use winit::window::Window;
 
-use crate::pipelines::Pipelines;
+use crate::{fpscounter::{self, FPSCounter}, pipelines::Pipelines};
 
 pub struct Renderer<'a> {
     surface: wgpu::Surface<'a>,
@@ -10,6 +10,7 @@ pub struct Renderer<'a> {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipelines: Pipelines,
+    fpscounter: FPSCounter
 }
 
 impl<'a> Renderer<'a> {
@@ -69,12 +70,15 @@ impl<'a> Renderer<'a> {
 
         let pipelines = Pipelines::new(&surface_config, &device);
 
+        let fpscounter = FPSCounter::new();
+
         Self {
             surface,
             device,
             queue,
             surface_config,
             pipelines,
+            fpscounter
         }
     }
 
@@ -97,8 +101,15 @@ impl<'a> Renderer<'a> {
         self.queue.submit(iter::once(encoder.finish()));
         output.present();
 
+        self.fpscounter.tick();
+
         Ok(())
     }
+
+    pub fn get_fps(&self) -> String {
+        self.fpscounter.print()
+    }
+
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.surface_config.width = width;
