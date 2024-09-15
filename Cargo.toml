@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bytemuck = { version = "1.18.0", features = ["derive", "min_const_generics"] }
+gltf = "1.4.1"
 instant = "0.1.13"
 pollster = "0.3.0"
 wgpu = "22.1.0"
