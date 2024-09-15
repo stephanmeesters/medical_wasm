@@ -1,8 +1,12 @@
 use std::iter;
 
+use wgpu::MultisampleState;
 use winit::window::Window;
 
-use crate::{fpscounter::{self, FPSCounter}, pipelines::Pipelines};
+use crate::{
+    fpscounter::{self, FPSCounter},
+    pipelines::Pipelines,
+};
 
 pub struct Renderer<'a> {
     surface: wgpu::Surface<'a>,
@@ -10,7 +14,8 @@ pub struct Renderer<'a> {
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipelines: Pipelines,
-    fpscounter: FPSCounter
+    fpscounter: FPSCounter,
+    multisample_framebuffer: wgpu::TextureView
 }
 
 impl<'a> Renderer<'a> {
@@ -72,14 +77,40 @@ impl<'a> Renderer<'a> {
 
         let fpscounter = FPSCounter::new();
 
+        let multisample_framebuffer = Renderer::create_multisampled_framebuffer(&device, &surface_config, 4);
+
         Self {
             surface,
             device,
             queue,
             surface_config,
             pipelines,
-            fpscounter
+            fpscounter,
+            multisample_framebuffer
         }
+    }
+
+    pub fn create_multisampled_framebuffer(
+        device: &wgpu::Device,
+        sc_desc: &wgpu::SurfaceConfiguration,
+        sample_count: u32,
+    ) -> wgpu::TextureView {
+        let multisampled_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Multisampled Framebuffer"),
+            size: wgpu::Extent3d {
+                width: sc_desc.width,
+                height: sc_desc.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count,
+            dimension: wgpu::TextureDimension::D2,
+            format: sc_desc.format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+
+        multisampled_texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
     pub async fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -95,8 +126,14 @@ impl<'a> Renderer<'a> {
                 label: Some("Render Encoder"),
             });
 
-        self.pipelines
-            .render(&self.surface_config, &self.device, &self.queue, &output_view, &mut encoder);
+        self.pipelines.render(
+            &self.surface_config,
+            &self.device,
+            &self.queue,
+            &output_view,
+            &self.multisample_framebuffer,
+            &mut encoder,
+        );
 
         self.queue.submit(iter::once(encoder.finish()));
         output.present();

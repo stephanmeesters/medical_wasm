@@ -26,11 +26,12 @@ impl Pipelines {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         output_view: &wgpu::TextureView,
+        multisample_framebuffer_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
         self.triangle_pipeline
             .pass(surface_config, device, queue, output_view, encoder);
         self.mesh_pipeline
-            .pass(surface_config, device, queue, output_view, encoder);
+            .pass(surface_config, device, queue, output_view, multisample_framebuffer_view, encoder);
     }
 }

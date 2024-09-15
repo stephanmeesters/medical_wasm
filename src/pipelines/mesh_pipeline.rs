@@ -118,7 +118,7 @@ impl MeshPipeline {
             },
             depth_stencil: None,
             multisample: wgpu::MultisampleState {
-                count: 1,
+                count: 4,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
@@ -140,13 +140,14 @@ impl MeshPipeline {
         _device: &wgpu::Device,
         _queue: &wgpu::Queue,
         output_view: &wgpu::TextureView,
+        multisample_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &output_view,
-                resolve_target: None,
+                view: &multisample_view,
+                resolve_target: Some(&output_view),
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
                         r: 0.1,
@@ -166,6 +167,5 @@ impl MeshPipeline {
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1)
-        // render_pass.draw(0..3, 0..1);
     }
 }
