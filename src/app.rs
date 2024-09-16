@@ -76,6 +76,7 @@ impl<'a> App<'a> {
 
     fn render(&mut self) {
         pollster::block_on(async move {
+            self.renderer.update();
             let _ = self.renderer.render().await;
             if self.last_update.elapsed() > Duration::from_secs(1) {
                 let fps = self.renderer.get_fps();

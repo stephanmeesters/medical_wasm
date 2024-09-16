@@ -5,8 +5,13 @@ edition = "2021"
 
 [dependencies]
 bytemuck = { version = "1.18.0", features = ["derive", "min_const_generics"] }
+cgmath = "0.18.0"
 gltf = "1.4.1"
 instant = "0.1.13"
 pollster = "0.3.0"
 wgpu = "22.1.0"
 winit = "0.29.15"
+
+[profile.release]
+# codegen-units = 1
+# lto = "thin"

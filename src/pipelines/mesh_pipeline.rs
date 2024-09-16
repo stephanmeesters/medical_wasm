@@ -1,5 +1,7 @@
 use gltf::Gltf;
-use wgpu::util::{DeviceExt, RenderEncoder};
+use wgpu::util::DeviceExt;
+
+use crate::camera::Camera;
 
 pub struct MeshPipeline {
     pipeline: wgpu::RenderPipeline,
@@ -23,7 +25,7 @@ pub struct ModelVertex {
 }
 
 impl MeshPipeline {
-    pub fn new(surface_config: &wgpu::SurfaceConfiguration, device: &wgpu::Device) -> Self {
+    pub fn new(surface_config: &wgpu::SurfaceConfiguration, device: &wgpu::Device, camera: &Camera) -> Self {
         let gltf =
             Gltf::open("/home/stephan/Dev/wgpu_raycaster_new/assets/models/monkey.glb").unwrap();
         let mesh = gltf.meshes().next().unwrap();
@@ -63,10 +65,11 @@ impl MeshPipeline {
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/mesh.wgsl").into()),
         });
 
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[],
+                bind_group_layouts: &[&camera.bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -136,12 +139,10 @@ impl MeshPipeline {
 
     pub fn pass(
         &self,
-        _surface_config: &wgpu::SurfaceConfiguration,
-        _device: &wgpu::Device,
-        _queue: &wgpu::Queue,
         output_view: &wgpu::TextureView,
         multisample_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
+        camera: &Camera
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
@@ -164,6 +165,7 @@ impl MeshPipeline {
         });
 
         render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &camera.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1)

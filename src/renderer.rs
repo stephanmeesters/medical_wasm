@@ -1,10 +1,10 @@
 use std::iter;
 
-use wgpu::MultisampleState;
 use winit::window::Window;
 
 use crate::{
-    fpscounter::{self, FPSCounter},
+    camera::Camera,
+    fpscounter::FPSCounter,
     pipelines::Pipelines,
 };
 
@@ -15,7 +15,8 @@ pub struct Renderer<'a> {
     queue: wgpu::Queue,
     pipelines: Pipelines,
     fpscounter: FPSCounter,
-    multisample_framebuffer: wgpu::TextureView
+    multisample_framebuffer: wgpu::TextureView,
+    camera: Camera,
 }
 
 impl<'a> Renderer<'a> {
@@ -65,7 +66,7 @@ impl<'a> Renderer<'a> {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::AutoVsync,
+            present_mode: wgpu::PresentMode::AutoNoVsync,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -73,11 +74,14 @@ impl<'a> Renderer<'a> {
 
         surface.configure(&device, &surface_config);
 
-        let pipelines = Pipelines::new(&surface_config, &device);
+        let camera = Camera::new(&device, &surface_config);
+
+        let pipelines = Pipelines::new(&surface_config, &device, &camera);
 
         let fpscounter = FPSCounter::new();
 
-        let multisample_framebuffer = Renderer::create_multisampled_framebuffer(&device, &surface_config, 4);
+        let multisample_framebuffer =
+            Renderer::create_multisampled_framebuffer(&device, &surface_config, 4);
 
         Self {
             surface,
@@ -86,7 +90,8 @@ impl<'a> Renderer<'a> {
             surface_config,
             pipelines,
             fpscounter,
-            multisample_framebuffer
+            multisample_framebuffer,
+            camera,
         }
     }
 
@@ -133,6 +138,7 @@ impl<'a> Renderer<'a> {
             &output_view,
             &self.multisample_framebuffer,
             &mut encoder,
+            &self.camera
         );
 
         self.queue.submit(iter::once(encoder.finish()));
@@ -141,6 +147,10 @@ impl<'a> Renderer<'a> {
         self.fpscounter.tick();
 
         Ok(())
+    }
+
+    pub fn update(&mut self) {
+        self.camera.update(&self.queue);
     }
 
     pub fn get_fps(&self) -> String {
@@ -152,6 +162,9 @@ impl<'a> Renderer<'a> {
             self.surface_config.width = width;
             self.surface_config.height = height;
             self.surface.configure(&self.device, &self.surface_config);
+
+            self.multisample_framebuffer =
+                Renderer::create_multisampled_framebuffer(&self.device, &self.surface_config, 4);
         }
     }
 }
