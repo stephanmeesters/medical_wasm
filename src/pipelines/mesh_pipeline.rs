@@ -21,7 +21,7 @@ pub async fn load_binary(file_name: &str) -> Vec<u8> {
 pub struct ModelVertex {
     pub position: [f32; 3],
     // pub tex_coords: [f32; 2],
-    // pub normal: [f32; 3],
+    pub normal: [f32; 3],
 }
 
 impl MeshPipeline {
@@ -46,12 +46,18 @@ impl MeshPipeline {
         }
         let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
         let vertices: Vec<[f32; 3]> = reader.read_positions().unwrap().collect();
+        let normals: Vec<[f32; 3]> = reader.read_normals().unwrap().collect();
+
+        let model_vertices: Vec<ModelVertex> = vertices.into_iter().zip(normals).map(|(position, normal)| {
+            ModelVertex { position, normal }
+        }).collect();
+
         let indices: Vec<u32> = reader.read_indices().unwrap().into_u32().collect();
         let num_indices = indices.len() as u32;
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("vertex buffer"),
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(&model_vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -88,11 +94,11 @@ impl MeshPipeline {
                             shader_location: 0,
                             format: wgpu::VertexFormat::Float32x3,
                         },
-                        // wgpu::VertexAttribute {
-                        //     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                        //     shader_location: 1,
-                        //     format: wgpu::VertexFormat::Float32x3,
-                        // },
+                        wgpu::VertexAttribute {
+                            offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                            shader_location: 1,
+                            format: wgpu::VertexFormat::Float32x3,
+                        },
                     ],
                 }],
                 compilation_options: Default::default(),
