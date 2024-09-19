@@ -80,8 +80,8 @@ impl Camera {
 
     fn build_view_projection_matrix(&mut self) -> cgmath::Matrix4<f32> {
         self.rot += 0.001;
-        let dist = 3.0;
-        self.eye = cgmath::point3(f32::sin(self.rot) * dist, 0.0, f32::cos(self.rot) * dist);
+        let dist = 6.0;
+        self.eye = cgmath::point3(f32::sin(self.rot) * dist, 1.0, f32::cos(self.rot) * dist);
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         proj * view

@@ -27,7 +27,7 @@ pub struct ModelVertex {
 impl MeshPipeline {
     pub fn new(surface_config: &wgpu::SurfaceConfiguration, device: &wgpu::Device, camera: &Camera) -> Self {
         let gltf =
-            Gltf::open("/home/stephan/Dev/wgpu_raycaster_new/assets/models/monkey.glb").unwrap();
+            Gltf::open("/home/stephan/Dev/wgpu_raycaster_new/assets/models/car.glb").unwrap();
         let mesh = gltf.meshes().next().unwrap();
         let primitive = mesh.primitives().next().unwrap();
         let mut buffer_data = Vec::new();
@@ -125,7 +125,12 @@ impl MeshPipeline {
                 unclipped_depth: false,
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState { 
+                format: wgpu::TextureFormat::Depth32Float,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default() }),
             multisample: wgpu::MultisampleState {
                 count: 4,
                 mask: !0,
@@ -147,6 +152,7 @@ impl MeshPipeline {
         &self,
         output_view: &wgpu::TextureView,
         multisample_view: &wgpu::TextureView,
+        depthbuffer_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         camera: &Camera
     ) {
@@ -155,6 +161,8 @@ impl MeshPipeline {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &multisample_view,
                 resolve_target: Some(&output_view),
+                // view: &output_view,
+                // resolve_target: None,
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
                         r: 0.1,
@@ -165,7 +173,14 @@ impl MeshPipeline {
                     store: wgpu::StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &depthbuffer_view,
+                depth_ops: Some(wgpu::Operations{
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store
+                }),
+                stencil_ops: None
+            }),
             occlusion_query_set: None,
             timestamp_writes: None,
         });

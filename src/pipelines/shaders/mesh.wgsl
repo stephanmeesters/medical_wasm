@@ -29,7 +29,7 @@ fn vs_main(model: VertexInput) -> VertexOutput {
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // let pp = length(in.normal.z);
-    let light = vec3(0.0, 0.0, 1.0);
+    let light = vec3(0.0, 1.0, 0.0);
     let pp = dot(in.normal, light); 
     return vec4<f32>(pp, pp, pp, 1.0);
 }

@@ -2,11 +2,7 @@ use std::iter;
 
 use winit::window::Window;
 
-use crate::{
-    camera::Camera,
-    fpscounter::FPSCounter,
-    pipelines::Pipelines,
-};
+use crate::{camera::Camera, fpscounter::FPSCounter, pipelines::Pipelines};
 
 pub struct Renderer<'a> {
     surface: wgpu::Surface<'a>,
@@ -16,6 +12,7 @@ pub struct Renderer<'a> {
     pipelines: Pipelines,
     fpscounter: FPSCounter,
     multisample_framebuffer: wgpu::TextureView,
+    depthbuffer: wgpu::TextureView,
     camera: Camera,
 }
 
@@ -84,6 +81,8 @@ impl<'a> Renderer<'a> {
         let multisample_framebuffer =
             Renderer::create_multisampled_framebuffer(&device, &surface_config, 4);
 
+        let depthbuffer = Renderer::create_depthbuffer(&device, &surface_config);
+
         Self {
             surface,
             device,
@@ -92,6 +91,7 @@ impl<'a> Renderer<'a> {
             pipelines,
             fpscounter,
             multisample_framebuffer,
+            depthbuffer,
             camera,
         }
     }
@@ -119,6 +119,28 @@ impl<'a> Renderer<'a> {
         multisampled_texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
+    pub fn create_depthbuffer(
+        device: &wgpu::Device,
+        sc_desc: &wgpu::SurfaceConfiguration,
+    ) -> wgpu::TextureView {
+        let depthbuffer_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Depthbuffer"),
+            size: wgpu::Extent3d {
+                width: sc_desc.width,
+                height: sc_desc.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 4,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
+        });
+
+        depthbuffer_texture.create_view(&wgpu::TextureViewDescriptor::default())
+    }
+
     pub async fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
 
@@ -138,8 +160,9 @@ impl<'a> Renderer<'a> {
             &self.queue,
             &output_view,
             &self.multisample_framebuffer,
+            &self.depthbuffer,
             &mut encoder,
-            &self.camera
+            &self.camera,
         );
 
         self.queue.submit(iter::once(encoder.finish()));
@@ -166,6 +189,8 @@ impl<'a> Renderer<'a> {
 
             self.multisample_framebuffer =
                 Renderer::create_multisampled_framebuffer(&self.device, &self.surface_config, 4);
+            self.depthbuffer =
+                Renderer::create_depthbuffer(&self.device, &self.surface_config);
         }
     }
 }

@@ -33,12 +33,13 @@ impl Pipelines {
         queue: &wgpu::Queue,
         output_view: &wgpu::TextureView,
         multisample_framebuffer_view: &wgpu::TextureView,
+        depthbuffer_view: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         camera: &Camera,
     ) {
         self.triangle_pipeline
             .pass(surface_config, device, queue, output_view, encoder);
         self.mesh_pipeline
-            .pass(output_view, multisample_framebuffer_view, encoder, camera);
+            .pass(output_view, multisample_framebuffer_view, depthbuffer_view, encoder, camera);
     }
 }
