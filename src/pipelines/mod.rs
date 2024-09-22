@@ -5,6 +5,7 @@ use crate::camera::Camera;
 
 pub mod mesh_pipeline;
 pub mod triangle_pipeline;
+pub mod raytrace_pipeline;
 
 pub struct Pipelines {
     triangle_pipeline: TrianglePipeline,

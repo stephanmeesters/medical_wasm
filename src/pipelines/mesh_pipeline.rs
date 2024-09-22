@@ -27,7 +27,7 @@ pub struct ModelVertex {
 impl MeshPipeline {
     pub fn new(surface_config: &wgpu::SurfaceConfiguration, device: &wgpu::Device, camera: &Camera) -> Self {
         let gltf =
-            Gltf::open("/home/stephan/Dev/wgpu_raycaster_new/assets/models/car.glb").unwrap();
+            Gltf::open("/home/stephan/Dev/medical_wasm/assets/models/car.glb").unwrap();
         let mesh = gltf.meshes().next().unwrap();
         let primitive = mesh.primitives().next().unwrap();
         let mut buffer_data = Vec::new();
