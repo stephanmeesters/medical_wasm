@@ -143,7 +143,6 @@ impl<'a> Renderer<'a> {
 
     pub async fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
-
         let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor {
             ..wgpu::TextureViewDescriptor::default()
         });
@@ -155,9 +154,6 @@ impl<'a> Renderer<'a> {
             });
 
         self.pipelines.render(
-            &self.surface_config,
-            &self.device,
-            &self.queue,
             &output_view,
             &self.multisample_framebuffer,
             &self.depthbuffer,
