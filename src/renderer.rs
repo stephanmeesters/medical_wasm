@@ -154,6 +154,7 @@ impl<'a> Renderer<'a> {
             });
 
         self.pipelines.render(
+            &self.device,
             &output_view,
             &self.multisample_framebuffer,
             &self.depthbuffer,

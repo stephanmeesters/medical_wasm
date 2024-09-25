@@ -1,9 +1,14 @@
 pub struct RaytracePipeline {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group: wgpu::BindGroup,
+    pub texture: wgpu::Texture
 }
 
 impl RaytracePipeline {
+    pub fn create_view(&self) -> wgpu::TextureView {
+        self.texture.create_view(&Default::default())
+    }
+
     pub fn new(device: &wgpu::Device) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),
@@ -70,6 +75,7 @@ impl RaytracePipeline {
         Self {
             pipeline,
             bind_group,
+            texture
         }
     }
 

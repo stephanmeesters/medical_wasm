@@ -1,15 +1,18 @@
 use mesh_pipeline::MeshPipeline;
 use raytrace_pipeline::RaytracePipeline;
+use sampletexture_pipeline::SampleTexturePipeline;
 
 use crate::camera::Camera;
 
 pub mod mesh_pipeline;
 pub mod raytrace_pipeline;
 pub mod triangle_pipeline;
+pub mod sampletexture_pipeline;
 
 pub struct Pipelines {
     mesh_pipeline: MeshPipeline,
     raytrace_pipeline: RaytracePipeline,
+    sample_pipeline: SampleTexturePipeline
 }
 
 impl Pipelines {
@@ -20,15 +23,18 @@ impl Pipelines {
     ) -> Self {
         let mesh_pipeline = MeshPipeline::new(&surface_config, &device, &camera);
         let raytrace_pipeline = RaytracePipeline::new(&device);
+        let sample_pipeline = SampleTexturePipeline::new(&surface_config, &device, raytrace_pipeline.create_view());
 
         Pipelines {
             mesh_pipeline,
             raytrace_pipeline,
+            sample_pipeline
         }
     }
 
     pub fn render(
         &self,
+        device: &wgpu::Device,
         output_view: &wgpu::TextureView,
         multisample_framebuffer_view: &wgpu::TextureView,
         depthbuffer_view: &wgpu::TextureView,
@@ -43,5 +49,6 @@ impl Pipelines {
             camera,
         );
         self.raytrace_pipeline.pass(encoder);
+        self.sample_pipeline.pass(device, output_view, encoder);
     }
 }

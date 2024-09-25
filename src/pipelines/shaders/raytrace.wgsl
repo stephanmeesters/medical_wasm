@@ -11,5 +11,9 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
 
     let fx: f32 = f32(screen_pos.x);
     let fy: f32 = f32(screen_pos.y);
+
+    if(screen_pos.x >= 50 && screen_pos.x <= 60) {
+        return;
+    }
     textureStore(color_buffer, screen_pos, vec4<f32>(fx / 100.0, fy / 100.0, 1.0, 1.0));
 }
