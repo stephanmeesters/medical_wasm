@@ -18,14 +18,14 @@ impl RaytracePipeline {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size: wgpu::Extent3d {
-                width: 100,
-                height: 100,
+                width: 500,
+                height: 500,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba32Float,
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING,
@@ -87,6 +87,6 @@ impl RaytracePipeline {
 
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_bind_group(0, &self.bind_group, &[]);
-        compute_pass.dispatch_workgroups((100 + 7) / 8, (100 + 7) / 8, 1);
+        compute_pass.dispatch_workgroups((500 + 7) / 8, (500 + 7) / 8, 1);
     }
 }

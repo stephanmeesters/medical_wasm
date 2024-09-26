@@ -21,8 +21,8 @@ impl SampleTexturePipeline {
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
             mipmap_filter: wgpu::FilterMode::Nearest,
             ..Default::default()
         });
@@ -33,7 +33,7 @@ impl SampleTexturePipeline {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
@@ -42,7 +42,7 @@ impl SampleTexturePipeline {
                     ty: wgpu::BindingType::Texture {
                         multisampled: false,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     },
                     count: None,
                 },
@@ -121,7 +121,7 @@ impl SampleTexturePipeline {
     fn get_screen_quad(&self, surface_width: u32, surface_height: u32) -> Quad {
         // let resolution = self.resolution;
 
-        let texture_ratio = 100 as f32 / 100 as f32;
+        let texture_ratio = 500 as f32 / 500 as f32;
         let screen_ratio = surface_width as f32 / surface_height as f32;
 
         let (w, h) = if texture_ratio > screen_ratio {
@@ -165,8 +165,8 @@ impl SampleTexturePipeline {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(self.get_screen_quad(
-                100,
-                100,
+                500,
+                500,
             ).get_vertices()),
             usage: wgpu::BufferUsages::VERTEX,
         });

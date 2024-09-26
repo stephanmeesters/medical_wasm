@@ -2,8 +2,9 @@ use std::time::{Duration};
 
 use instant::Instant;
 use winit::dpi::PhysicalSize;
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
+use winit::keyboard::KeyCode;
 use winit::window::{Window, WindowBuilder};
 
 use crate::renderer::Renderer;
@@ -65,7 +66,9 @@ impl<'a> App<'a> {
             WindowEvent::CloseRequested => elwt.exit(),
             WindowEvent::Resized(size) => self.resize(size),
             WindowEvent::RedrawRequested => self.render(),
-            WindowEvent::KeyboardInput { .. } |
+            WindowEvent::KeyboardInput { event: key_event, ..} => {
+                self.keyboard_input(key_event, elwt)
+            },
             WindowEvent::MouseWheel { .. } |
             WindowEvent::MouseInput { .. } |
             WindowEvent::CursorMoved { .. } => {}, 
@@ -89,6 +92,17 @@ impl<'a> App<'a> {
 
     fn resize(&mut self, size: &PhysicalSize<u32>) {
         self.renderer.resize(size.width, size.height);
+    }
+
+    fn keyboard_input(&mut self, event: &KeyEvent, elwt: &EventLoopWindowTarget<()>) {
+        match event.physical_key {
+            winit::keyboard::PhysicalKey::Code(keycode) => {
+                if keycode == KeyCode::KeyQ {
+                    elwt.exit();
+                }
+            },
+            winit::keyboard::PhysicalKey::Unidentified(_) => ()
+        }
     }
 }
 

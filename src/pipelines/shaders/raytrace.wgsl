@@ -1,4 +1,4 @@
-@group(0) @binding(0) var color_buffer: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(0) var color_buffer: texture_storage_2d<rgba8unorm, write>;
 
 @compute @workgroup_size(8,8,1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
@@ -15,5 +15,5 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     if(screen_pos.x >= 50 && screen_pos.x <= 60) {
         return;
     }
-    textureStore(color_buffer, screen_pos, vec4<f32>(fx / 100.0, fy / 100.0, 1.0, 1.0));
+    textureStore(color_buffer, screen_pos, vec4<f32>(fx / 500.0, fy / 500.0, 1.0, 1.0));
 }
