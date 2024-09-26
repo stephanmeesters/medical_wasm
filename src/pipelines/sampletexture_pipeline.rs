@@ -4,7 +4,6 @@ use crate::{quad::Quad, vertex::Vertex};
 pub struct SampleTexturePipeline {
     pipeline: wgpu::RenderPipeline,
     bind_group: wgpu::BindGroup,
-    sample_view: wgpu::TextureView
 }
 
 impl SampleTexturePipeline {
@@ -114,30 +113,15 @@ impl SampleTexturePipeline {
         SampleTexturePipeline {
             pipeline,
             bind_group,
-            sample_view
         }
     }
 
-    fn get_screen_quad(&self, surface_width: u32, surface_height: u32) -> Quad {
-        // let resolution = self.resolution;
-
-        let texture_ratio = 500 as f32 / 500 as f32;
-        let screen_ratio = surface_width as f32 / surface_height as f32;
-
-        let (w, h) = if texture_ratio > screen_ratio {
-            (surface_width as f32, surface_width as f32 / texture_ratio)
-        } else {
-            (surface_height as f32 * texture_ratio, surface_height as f32)
-        };
-
-        let x = (surface_width as f32 - w) / 2.0;
-        let y = (surface_height as f32 - h) / 2.0;
-
+    fn get_screen_quad() -> Quad {
         Quad::new(
-            x / surface_width as f32,
-            y / surface_height as f32,
-            w / surface_width as f32,
-            h / surface_height as f32,
+            0.0,
+            0.0,
+            1.0,
+            1.0
         )
     }
 
@@ -164,10 +148,7 @@ impl SampleTexturePipeline {
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(self.get_screen_quad(
-                500,
-                500,
-            ).get_vertices()),
+            contents: bytemuck::cast_slice(SampleTexturePipeline::get_screen_quad().get_vertices()),
             usage: wgpu::BufferUsages::VERTEX,
         });
 

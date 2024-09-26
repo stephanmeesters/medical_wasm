@@ -101,7 +101,7 @@ impl<'a> App<'a> {
                     elwt.exit();
                 }
             },
-            winit::keyboard::PhysicalKey::Unidentified(_) => ()
+            _ => ()
         }
     }
 }
