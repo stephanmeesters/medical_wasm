@@ -1,3 +1,5 @@
+use crate::camera::Camera;
+
 pub struct RaytracePipeline {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group: wgpu::BindGroup,
@@ -9,7 +11,7 @@ impl RaytracePipeline {
         self.texture.create_view(&Default::default())
     }
 
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new(device: &wgpu::Device, camera: &Camera) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/raytrace.wgsl").into()),
@@ -45,6 +47,16 @@ impl RaytracePipeline {
                     view_dimension: wgpu::TextureViewDimension::D2,
                 },
                 count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None
+                },
+                count: None,
             }],
         });
 
@@ -54,6 +66,10 @@ impl RaytracePipeline {
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::TextureView(&texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: camera.buffer.as_entire_binding()
             }],
         });
 
