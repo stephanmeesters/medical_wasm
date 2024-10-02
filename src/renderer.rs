@@ -159,7 +159,7 @@ impl<'a> Renderer<'a> {
             &self.multisample_framebuffer,
             &self.depthbuffer,
             &mut encoder,
-            &self.camera,
+            
         );
 
         self.queue.submit(iter::once(encoder.finish()));

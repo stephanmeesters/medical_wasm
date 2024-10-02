@@ -10,7 +10,7 @@ pub mod triangle_pipeline;
 pub mod sampletexture_pipeline;
 
 pub struct Pipelines {
-    mesh_pipeline: MeshPipeline,
+    // mesh_pipeline: MeshPipeline,
     raytrace_pipeline: RaytracePipeline,
     sample_pipeline: SampleTexturePipeline
 }
@@ -21,12 +21,12 @@ impl Pipelines {
         device: &wgpu::Device,
         camera: &Camera,
     ) -> Self {
-        let mesh_pipeline = MeshPipeline::new(&surface_config, &device, &camera);
+        // let mesh_pipeline = MeshPipeline::new(&surface_config, &device, &camera);
         let raytrace_pipeline = RaytracePipeline::new(&device, &camera);
         let sample_pipeline = SampleTexturePipeline::new(&surface_config, &device, raytrace_pipeline.create_view());
 
         Pipelines {
-            mesh_pipeline,
+            // mesh_pipeline,
             raytrace_pipeline,
             sample_pipeline
         }
@@ -36,18 +36,18 @@ impl Pipelines {
         &self,
         device: &wgpu::Device,
         output_view: &wgpu::TextureView,
-        multisample_framebuffer_view: &wgpu::TextureView,
-        depthbuffer_view: &wgpu::TextureView,
-        encoder: &mut wgpu::CommandEncoder,
-        camera: &Camera,
+        _multisample_framebuffer_view: &wgpu::TextureView,
+        _depthbuffer_view: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder
+        // _camera: &Camera,
     ) {
-        self.mesh_pipeline.pass(
-            output_view,
-            multisample_framebuffer_view,
-            depthbuffer_view,
-            encoder,
-            camera,
-        );
+        // self.mesh_pipeline.pass(
+        //     output_view,
+        //     multisample_framebuffer_view,
+        //     depthbuffer_view,
+        //     encoder,
+        //     camera,
+        // );
         self.raytrace_pipeline.pass(encoder);
         self.sample_pipeline.pass(device, output_view, encoder);
     }

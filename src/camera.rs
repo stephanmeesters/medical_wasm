@@ -1,3 +1,4 @@
+use cgmath::InnerSpace;
 use wgpu::util::DeviceExt;
 
 // #[rustfmt::skip]
@@ -9,6 +10,9 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
     model_view_proj: [[f32; 4]; 4],
+    position: [f32; 3],
+    direction: [f32; 3],
+    padding: [f32; 2]
 }
 
 pub struct Camera {
@@ -31,6 +35,9 @@ impl Camera {
         use cgmath::SquareMatrix;
         let uniform = CameraUniform {
             model_view_proj: cgmath::Matrix4::identity().into(),
+            direction: (0.0, 0.0, 5.0).into(),
+            position: (0.0, 0.0, 5.0).into(),
+            padding: (0.0, 0.0).into()
         };
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -68,7 +75,7 @@ impl Camera {
             up: cgmath::Vector3::unit_y(),
             aspect: surface_config.width as f32 / surface_config.height as f32,
             fovy: 45.0,
-            znear: 0.1,
+            znear: 1.0,
             zfar: 100.0,
             rot: 0.0,
             uniform,
@@ -85,10 +92,14 @@ impl Camera {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         proj * view
+        // println!("{:?}", view * cgmath::vec4(0.0, 0.0, 0.0, 1.0));
+        // view
     }
 
     pub fn update(&mut self, queue: &wgpu::Queue) {
         self.uniform.model_view_proj = (OPENGL_TO_WGPU_MATRIX * self.build_view_projection_matrix()).into();
+        self.uniform.position = self.eye.into();
+        self.uniform.direction = (self.eye - self.target).normalize().into();
         queue.write_buffer(
             &self.buffer,
             0,

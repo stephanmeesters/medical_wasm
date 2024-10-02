@@ -1,5 +1,7 @@
 struct CameraUniform {
     view_proj: mat4x4<f32>,
+    position: vec3<f32>,
+    direction: vec3<f32>
 };
 
 struct Ray {
@@ -37,18 +39,19 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     // }
     // textureStore(color_buffer, screen_pos, vec4<f32>(fx / 500.0, fy / 500.0, 1.0, 1.0));
 
-//     let npos1 = camera.view_proj * vec4<f32>(polygon_positions[0], 1.0);
-//     let npos2 = camera.view_proj * vec4<f32>(polygon_positions[1], 1.0);
-//     let npos3 = camera.view_proj * vec4<f32>(polygon_positions[2], 1.0);
-//     let npos = array<vec3<f32>,3>(
-//     npos1.xyz,
-//     npos2.xyz,
-//     npos3.xyz,
-// );
+    // let npos1 = camera.view_proj * vec4<f32>(polygon_positions[0], 1.0);
+    // let npos2 = camera.view_proj * vec4<f32>(polygon_positions[1], 1.0);
+    // let npos3 = camera.view_proj * vec4<f32>(polygon_positions[2], 1.0);
+    // let npos = array<vec3<f32>,3>(
+    //     npos1.xyz,
+    //     npos2.xyz,
+    //     npos3.xyz,
+    // );
 
-    let camera_pos = camera.view_proj * vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    // let camera_pos = camera.view_proj * vec4<f32>(0.0, 0.0, 1.0, 1.0);
+    // let camera_pos = vec4<f32>(0.0);
 
-    var ray = raystart(screen_pos, camera_pos.xyz, camera.view_proj);
+    var ray = raystart(screen_pos, camera.position, camera.direction);
     // var weights = polygon_ray_intersection(ray, polygon_positions);
 
     if PointInTriangle(ray, polygon_positions) {
@@ -114,16 +117,17 @@ fn PointInTriangleCoords(pt: Ray, polygon: array<vec3<f32>, 3>) -> vec3<f32> {
     return vec3<f32>(d1, d2, d3);
 }
 
-fn raystart(screenPos: vec2<i32>, camPos: vec3<f32>, trans: mat4x4<f32>) -> Ray {
+fn raystart(screenPos: vec2<i32>, camPos: vec3<f32>, camDir: vec3<f32>) -> Ray {
     let s = -2.0 * tan(fov * 0.5);
-    let start = vec3<f32>(
-        (f32(screenPos.x) / f32(screen_width) - 0.5f) * s,
-        -(f32(screenPos.y) / f32(screen_height) - 0.5f) * s,
-        1.0
-    );
 
-    let ttt = (trans * vec4<f32>(start, 1.0)).xyz;
-    return Ray(ttt , normalize(ttt - camPos));
+    let up = vec3<f32>(0.0, 0.0, 1.0);
+    let kk = normalize(cross(camDir, up));
+
+    var start = camPos;
+    start += (f32(screenPos.x) / f32(screen_width) - 0.5f) * kk;
+    start +=  (f32(screenPos.y) / f32(screen_height) - 0.5f) * up;
+    
+    return Ray(start, normalize(start));
 }
 
 // compute barycentic coordinates

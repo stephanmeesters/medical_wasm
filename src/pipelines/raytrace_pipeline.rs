@@ -69,7 +69,7 @@ impl RaytracePipeline {
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: camera.buffer.as_entire_binding()
+                resource: camera.buffer.as_entire_binding(),
             }],
         });
 
