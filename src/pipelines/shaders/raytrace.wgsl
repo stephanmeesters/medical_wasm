@@ -1,13 +1,16 @@
 struct CameraUniform {
-    view_proj: mat4x4<f32>,
-    position: vec3<f32>,
-    direction: vec3<f32>
+    // view_proj: mat4x4<f32>,
+    position: vec3<f32>,_pad1: f32,
+    direction: vec3<f32>,_pad2: f32,
+    up: vec3<f32>,_pad3: f32,
+    side: vec3<f32>,_pad4: f32,
 };
 
 struct Ray {
     start: vec3<f32>,
     direction: vec3<f32>
 }
+
 
 @group(0) @binding(0) var color_buffer: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(1) var<uniform> camera: CameraUniform;
@@ -51,15 +54,36 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     // let camera_pos = camera.view_proj * vec4<f32>(0.0, 0.0, 1.0, 1.0);
     // let camera_pos = vec4<f32>(0.0);
 
-    var ray = raystart(screen_pos, camera.position, camera.direction);
+    var ray = raystart(screen_pos);
     // var weights = polygon_ray_intersection(ray, polygon_positions);
 
+    let sphere_pos = vec3<f32>(0.0);
+    let sphere_radius = 0.3f;
+
+    // if hit_sphere(sphere_pos, sphere_radius, ray) > 0.0 {
+    //     textureStore(color_buffer, screen_pos, vec4<f32>(1.0));
+    // } else {
+    //     textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
+    // }
     if PointInTriangle(ray, polygon_positions) {
         var weights = PointInTriangleCoords(ray, polygon_positions);
         textureStore(color_buffer, screen_pos, vec4<f32>(weights, 1.0));
-    } else {
-        textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
+    } 
+
+    let t = hit_sphere(sphere_pos, sphere_radius, ray);
+    if t > 0.0 {
+        let N = normalize((ray.start + ray.direction * t) - sphere_pos);
+        textureStore(color_buffer, screen_pos, vec4<f32>((N+1)/2.0, 1.0));
+        // textureStore(color_buffer, screen_pos, vec4<f32>(t, t, t, 1.0));
     }
+    else {
+        textureStore(color_buffer, screen_pos, vec4<f32>(0.0, 0.0, 0.0, 1.0));
+    }
+
+    // textureStore(color_buffer, screen_pos, vec4<f32>(ray.start, 1.0));
+// else {
+//         textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
+//     }
 
 
     // textureStore(color_buffer, screen_pos, vec4<f32>(weights[0] + weights[1] + weights[2]));
@@ -90,6 +114,20 @@ fn sign(p1: vec3<f32>, p2: vec3<f32>, p3: vec3<f32>) -> f32 {
     return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
 }
 
+fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray) -> f32 {
+    let oc = center - r.start;
+    let a = dot(r.direction, r.direction);
+    let b = -2.0 * dot(r.direction, oc);
+    let c = dot(oc, oc) - radius * radius;
+    let discriminant = b * b - 4 * a * c;
+
+    if discriminant < 0 {
+        return -1.0;
+    } else {
+        return (-b - sqrt(discriminant)) / (2.0 * a);
+    }
+}
+
 fn PointInTriangle(pt: Ray, polygon: array<vec3<f32>, 3>) -> bool {
     let v1 = polygon[0];
     let v2 = polygon[1];
@@ -117,17 +155,16 @@ fn PointInTriangleCoords(pt: Ray, polygon: array<vec3<f32>, 3>) -> vec3<f32> {
     return vec3<f32>(d1, d2, d3);
 }
 
-fn raystart(screenPos: vec2<i32>, camPos: vec3<f32>, camDir: vec3<f32>) -> Ray {
-    let s = -2.0 * tan(fov * 0.5);
+fn raystart(screenPos: vec2<i32>) -> Ray {
+    // let s = -2.0 * tan(fov * 0.5);
 
-    let up = vec3<f32>(0.0, 0.0, 1.0);
-    let kk = normalize(cross(camDir, up));
+    var start = camera.position;
+    start += (f32(screenPos.x) / f32(screen_width) - 0.5f) * camera.side;
+    start += (f32(screenPos.y) / f32(screen_height) - 0.5f) * camera.up;
+    start -= camera.direction;
 
-    var start = camPos;
-    start += (f32(screenPos.x) / f32(screen_width) - 0.5f) * kk;
-    start +=  (f32(screenPos.y) / f32(screen_height) - 0.5f) * up;
-    
-    return Ray(start, normalize(start));
+    // return Ray(start, camera.direction);
+    return Ray(start, normalize( camera.position - start));
 }
 
 // compute barycentic coordinates

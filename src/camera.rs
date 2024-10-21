@@ -9,10 +9,15 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
-    model_view_proj: [[f32; 4]; 4],
+    // model_view_proj: [[f32; 4]; 4], // 16x4 = 64
     position: [f32; 3],
+    _pad1: f32,        // Padding of 4 bytes
     direction: [f32; 3],
-    padding: [f32; 2]
+    _pad2: f32,        // Padding of 4 bytes
+    up: [f32; 3],
+    _pad3: f32,        // Padding of 4 bytes
+    side: [f32; 3],
+    _pad4: f32,        // Padding of 4 bytes
 }
 
 pub struct Camera {
@@ -32,12 +37,18 @@ pub struct Camera {
 
 impl Camera {
     pub fn new(device: &wgpu::Device, surface_config: &wgpu::SurfaceConfiguration) -> Self {
-        use cgmath::SquareMatrix;
+        // use cgmath::SquareMatrix;
         let uniform = CameraUniform {
-            model_view_proj: cgmath::Matrix4::identity().into(),
+            // model_view_proj: cgmath::Matrix4::identity().into(),
             direction: (0.0, 0.0, 5.0).into(),
             position: (0.0, 0.0, 5.0).into(),
-            padding: (0.0, 0.0).into()
+            up: (0.0, 0.0, 1.0).into(),
+            side: (0.0, 0.0, 1.0).into(),
+            // padding: (0.0, 0.0, 0.0, 0.0).into()
+            _pad1: 0.0,
+            _pad2: 0.0,
+            _pad3: 0.0,
+            _pad4: 0.0,
         };
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -86,9 +97,11 @@ impl Camera {
     }
 
     fn build_view_projection_matrix(&mut self) -> cgmath::Matrix4<f32> {
-        self.rot += 0.001;
-        let dist = 6.0;
-        self.eye = cgmath::point3(f32::sin(self.rot) * dist, 1.0, f32::cos(self.rot) * dist);
+        self.rot += 0.01;
+        let mut dist = 3.0 + 1.0 * f32::sin(self.rot);
+        dist *= 0.5;
+        // let dist = 2.0;
+        self.eye = cgmath::point3(f32::sin(self.rot) * dist, 0.0, f32::cos(self.rot) * dist);
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         proj * view
@@ -97,9 +110,13 @@ impl Camera {
     }
 
     pub fn update(&mut self, queue: &wgpu::Queue) {
-        self.uniform.model_view_proj = (OPENGL_TO_WGPU_MATRIX * self.build_view_projection_matrix()).into();
+        self.build_view_projection_matrix();
+        // self.uniform.model_view_proj = (OPENGL_TO_WGPU_MATRIX * self.build_view_projection_matrix()).into();
         self.uniform.position = self.eye.into();
-        self.uniform.direction = (self.eye - self.target).normalize().into();
+        self.uniform.direction = (self.target - self.eye).normalize().into();
+        self.uniform.up = self.up.into();
+        self.uniform.side = self.up.cross(cgmath::vec3(self.eye.x, self.eye.y, self.eye.z)).normalize().into();
+        // println!("{:?}", self.uniform);
         queue.write_buffer(
             &self.buffer,
             0,
