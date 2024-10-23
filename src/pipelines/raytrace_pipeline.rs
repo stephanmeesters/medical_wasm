@@ -20,8 +20,8 @@ impl RaytracePipeline {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size: wgpu::Extent3d {
-                width: 500,
-                height: 500,
+                width: 1000,
+                height: 1000,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -103,6 +103,6 @@ impl RaytracePipeline {
 
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_bind_group(0, &self.bind_group, &[]);
-        compute_pass.dispatch_workgroups((500 + 7) / 8, (500 + 7) / 8, 1);
+        compute_pass.dispatch_workgroups((self.texture.width() + 7) / 8, (self.texture.height() + 7) / 8, 1);
     }
 }

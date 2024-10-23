@@ -1,23 +1,28 @@
 struct CameraUniform {
-    // view_proj: mat4x4<f32>,
-    position: vec3<f32>,_pad1: f32,
-    direction: vec3<f32>,_pad2: f32,
-    up: vec3<f32>,_pad3: f32,
-    side: vec3<f32>,_pad4: f32,
+    // Camera parameters
+    position: vec3<f32>,
+    _pad1: f32,
+    direction: vec3<f32>,
+    _pad2: f32,
+    up: vec3<f32>,
+    _pad3: f32,
+    side: vec3<f32>,
+    _pad4: f32,
 };
 
 struct Ray {
     start: vec3<f32>,
-    direction: vec3<f32>
+    direction: vec3<f32>,
 }
 
-
-@group(0) @binding(0) var color_buffer: texture_storage_2d<rgba8unorm, write>;
-@group(0) @binding(1) var<uniform> camera: CameraUniform;
+@group(0) @binding(0)
+var color_buffer: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(1)
+var<uniform> camera: CameraUniform;
 
 const fov: f32 = 1.6;
-const screen_width: i32 = 500;
-const screen_height: i32 = 500;
+const screen_width: f32 = 1000.0;
+const screen_height: f32 = 1000.0;
 
 const polygon_positions = array<vec3<f32>, 3>(
     vec3<f32>(-0.0, -0.0, 0.0),
@@ -25,163 +30,126 @@ const polygon_positions = array<vec3<f32>, 3>(
     vec3<f32>(0.0, -0.5, 0.0),
 );
 
-@compute @workgroup_size(8,8,1)
+@compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
-    let screen_size: vec2<i32> = vec2<i32>(textureDimensions(color_buffer));
-    let screen_pos: vec2<i32> = vec2<i32>(i32(GlobalInvocationID.x), i32(GlobalInvocationID.y));
+    let screen_size: vec2<u32> = textureDimensions(color_buffer);
+    let screen_pos_u32: vec2<u32> = GlobalInvocationID.xy;
 
-    if screen_pos.x >= screen_size.x || screen_pos.y >= screen_size.y {
+    if screen_pos_u32.x >= screen_size.x || screen_pos_u32.y >= screen_size.y {
         return;
     }
 
-    // let fx: f32 = f32(screen_pos.x);
-    // let fy: f32 = f32(screen_pos.y);
-    //
-    // if(screen_pos.x >= 50 && screen_pos.x <= 60) {
-    //     return;
-    // }
-    // textureStore(color_buffer, screen_pos, vec4<f32>(fx / 500.0, fy / 500.0, 1.0, 1.0));
-
-    // let npos1 = camera.view_proj * vec4<f32>(polygon_positions[0], 1.0);
-    // let npos2 = camera.view_proj * vec4<f32>(polygon_positions[1], 1.0);
-    // let npos3 = camera.view_proj * vec4<f32>(polygon_positions[2], 1.0);
-    // let npos = array<vec3<f32>,3>(
-    //     npos1.xyz,
-    //     npos2.xyz,
-    //     npos3.xyz,
-    // );
-
-    // let camera_pos = camera.view_proj * vec4<f32>(0.0, 0.0, 1.0, 1.0);
-    // let camera_pos = vec4<f32>(0.0);
-
-    var ray = raystart(screen_pos);
-    // var weights = polygon_ray_intersection(ray, polygon_positions);
-
-    let sphere_pos = vec3<f32>(0.0);
-    let sphere_radius = 0.3f;
-
-    // if hit_sphere(sphere_pos, sphere_radius, ray) > 0.0 {
-    //     textureStore(color_buffer, screen_pos, vec4<f32>(1.0));
-    // } else {
-    //     textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
-    // }
-    if PointInTriangle(ray, polygon_positions) {
-        var weights = PointInTriangleCoords(ray, polygon_positions);
-        textureStore(color_buffer, screen_pos, vec4<f32>(weights, 1.0));
-    } 
-
-    let t = hit_sphere(sphere_pos, sphere_radius, ray);
-    if t > 0.0 {
-        let N = normalize((ray.start + ray.direction * t) - sphere_pos);
-        textureStore(color_buffer, screen_pos, vec4<f32>((N+1)/2.0, 1.0));
-        // textureStore(color_buffer, screen_pos, vec4<f32>(t, t, t, 1.0));
-    }
-    else {
-        textureStore(color_buffer, screen_pos, vec4<f32>(0.0, 0.0, 0.0, 1.0));
-    }
-
-    // textureStore(color_buffer, screen_pos, vec4<f32>(ray.start, 1.0));
-// else {
-//         textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
-//     }
+    let offset = 0.5;
+    var color = castray(vec2<f32>(screen_pos_u32));
+    color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)-offset));
+    color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)-offset));
+    color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)+offset));
+    color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)+offset));
+    color /= 5.0;
 
 
-    // textureStore(color_buffer, screen_pos, vec4<f32>(weights[0] + weights[1] + weights[2]));
-
-    // if weights[0] < 0.0 || weights[1] < 0.0 || weights[2] < 0.0 {
-    // if weights[0] + weights[1] + weights[2] < 1.0 {
-    //     textureStore(color_buffer, screen_pos, vec4<f32>(1.0));
-    // } else {
-    //     textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
-    // }
-    //
-    // var bb = ray.direction;
-    // bb += vec3<f32>(1.0);
-    // bb /= 5.0;
-
-    // if(ray.start.x > -0.5 && ray.start.x < 0.5 &&
-    //     ray.start.y > -0.5 && ray.start.y < 0.5)
-    // {
-    //     textureStore(color_buffer, screen_pos, vec4<f32>(1.0));
-    // }
-    // else
-    // {
-    //     textureStore(color_buffer, screen_pos, vec4<f32>(0.0));
-    // }
+    let screen_pos_i32 = vec2<i32>(screen_pos_u32);
+    textureStore(color_buffer, screen_pos_i32, color);
 }
 
-fn sign(p1: vec3<f32>, p2: vec3<f32>, p3: vec3<f32>) -> f32 {
-    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
+    var ray = raystart(screen_pos);
+
+    let sphere_pos = vec3<f32>(0.0, 0.0, 0.0);
+    let sphere_radius = 0.3;
+
+    var color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
+    // Check for intersection with the triangle
+    let t_triangle = intersectTriangle(ray, polygon_positions[0], polygon_positions[1], polygon_positions[2]);
+    if t_triangle > 0.0 {
+        let intersection_point = ray.start + ray.direction * t_triangle;
+        let bary_coords = computeBarycentricCoords(intersection_point, polygon_positions[0], polygon_positions[1], polygon_positions[2]);
+        color = vec4<f32>(bary_coords, 1.0);
+    } else {
+        // Check for intersection with the sphere
+        let t_sphere = hit_sphere(sphere_pos, sphere_radius, ray);
+        if t_sphere > 0.0 {
+            let N = normalize((ray.start + ray.direction * t_sphere) - sphere_pos);
+            color = vec4<f32>((N + 1.0) / 2.0, 1.0);
+        }
+    }
+
+    return color;
 }
 
 fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray) -> f32 {
-    let oc = center - r.start;
+    let oc = r.start - center;
     let a = dot(r.direction, r.direction);
-    let b = -2.0 * dot(r.direction, oc);
+    let b = 2.0 * dot(oc, r.direction);
     let c = dot(oc, oc) - radius * radius;
-    let discriminant = b * b - 4 * a * c;
+    let discriminant = b * b - 4.0 * a * c;
 
-    if discriminant < 0 {
+    if discriminant < 0.0 {
         return -1.0;
     } else {
         return (-b - sqrt(discriminant)) / (2.0 * a);
     }
 }
 
-fn PointInTriangle(pt: Ray, polygon: array<vec3<f32>, 3>) -> bool {
-    let v1 = polygon[0];
-    let v2 = polygon[1];
-    let v3 = polygon[2];
-
-    let d1 = sign(pt.start, v1, v2);
-    let d2 = sign(pt.start, v2, v3);
-    let d3 = sign(pt.start, v3, v1);
-
-    let has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-    let has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-
-    return !(has_neg && has_pos);
+fn intersectTriangle(ray: Ray, v0: vec3<f32>, v1: vec3<f32>, v2: vec3<f32>) -> f32 {
+    let edge1 = v1 - v0;
+    let edge2 = v2 - v0;
+    let h = cross(ray.direction, edge2);
+    let a = dot(edge1, h);
+    if abs(a) < 1e-5 {
+        return -1.0; // Ray is parallel to triangle
+    }
+    let f = 1.0 / a;
+    let s = ray.start - v0;
+    let u = f * dot(s, h);
+    if u < 0.0 || u > 1.0 {
+        return -1.0;
+    }
+    let q = cross(s, edge1);
+    let v = f * dot(ray.direction, q);
+    if v < 0.0 || (u + v) > 1.0 {
+        return -1.0;
+    }
+    let t = f * dot(edge2, q);
+    if t > 1e-5 {
+        return t; // Intersection with the triangle
+    } else {
+        return -1.0; // No valid intersection
+    }
 }
 
-fn PointInTriangleCoords(pt: Ray, polygon: array<vec3<f32>, 3>) -> vec3<f32> {
-    let v1 = polygon[0];
-    let v2 = polygon[1];
-    let v3 = polygon[2];
-
-    let d1 = sign(pt.start, v1, v2);
-    let d2 = sign(pt.start, v2, v3);
-    let d3 = sign(pt.start, v3, v1);
-
-    return vec3<f32>(d1, d2, d3);
+fn computeBarycentricCoords(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>) -> vec3<f32> {
+    let v0 = b - a;
+    let v1 = c - a;
+    let v2 = p - a;
+    let d00 = dot(v0, v0);
+    let d01 = dot(v0, v1);
+    let d11 = dot(v1, v1);
+    let d20 = dot(v2, v0);
+    let d21 = dot(v2, v1);
+    let denom = d00 * d11 - d01 * d01;
+    let v = (d11 * d20 - d01 * d21) / denom;
+    let w = (d00 * d21 - d01 * d20) / denom;
+    let u = 1.0 - v - w;
+    return vec3<f32>(u, v, w);
 }
 
-fn raystart(screenPos: vec2<i32>) -> Ray {
-    // let s = -2.0 * tan(fov * 0.5);
+fn raystart(screenPos: vec2<f32>) -> Ray {
+    // Normalized Device Coordinates (NDC)
+    let ndc_x = (screenPos.x + 0.5) / screen_width * 2.0 - 1.0;
+    let ndc_y = 1.0 - ((screenPos.y + 0.5) / screen_height * 2.0); // Flip Y-axis
 
-    var start = camera.position;
-    start += (f32(screenPos.x) / f32(screen_width) - 0.5f) * camera.side;
-    start += (f32(screenPos.y) / f32(screen_height) - 0.5f) * camera.up;
-    start -= camera.direction;
+    let aspect_ratio = screen_width / screen_height;
+    let fov_adjustment = tan(fov / 2.0);
 
-    // return Ray(start, camera.direction);
-    return Ray(start, normalize( camera.position - start));
+    // Compute the ray direction
+    let ray_dir = normalize(
+        ndc_x * aspect_ratio * fov_adjustment * camera.side +
+        ndc_y * fov_adjustment * camera.up +
+        camera.direction
+    );
+
+    return Ray(camera.position, ray_dir);
 }
 
-// compute barycentic coordinates
-fn polygon_ray_intersection(ray: Ray, polygon: array<vec3<f32>,3>) -> vec3<f32> {
-    let e1 = polygon[1] - polygon[0];
-    let e2 = polygon[2] - polygon[0];
-    let q = cross(ray.direction, e2);
-
-    let a = dot(e1, q);
-
-    let s = ray.start - polygon[0];
-    let r = cross(s, e1);
-
-    var weight = vec3<f32>(0.0);
-    weight[0] = dot(s, q) / a;
-    weight[1] = dot(ray.direction, r) / a;
-    weight[2] = 1.0 - (weight[1] + weight[2]);
-
-    return weight;
-}
