@@ -30,26 +30,55 @@ const polygon_positions = array<vec3<f32>, 3>(
     vec3<f32>(0.0, -0.5, 0.0),
 );
 
+const numSamples: u32 = 100;
+
+fn hash22(p: vec2<f32>) -> vec2<f32> {
+    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+fn hash32(p: vec2<f32>) -> vec3<f32> {
+    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return fract((p3.xxy + p3.yzz) * p3.zyx);
+}
+
 @compute @workgroup_size(8, 8, 1)
 fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     let screen_size: vec2<u32> = textureDimensions(color_buffer);
     let screen_pos_u32: vec2<u32> = GlobalInvocationID.xy;
+    let global_id_1d: u32 = screen_pos_u32.y * screen_size.x + screen_pos_u32.x;
 
     if screen_pos_u32.x >= screen_size.x || screen_pos_u32.y >= screen_size.y {
         return;
     }
 
-    let offset = 0.5;
-    var color = castray(vec2<f32>(screen_pos_u32));
-    color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)-offset));
-    color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)-offset));
-    color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)+offset));
-    color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)+offset));
-    color /= 5.0;
-
-
+    // take samples
+    var color: vec4<f32>;
+    let offset = 1.0;
+    for (var i: u32 = 0; i < numSamples; i = i + 1) {
+        let coord = hash22(vec2<f32>(f32(screen_pos_u32.x)*10000+f32(i)*123123, f32(screen_pos_u32.y)*100000+f32(i)*456456)) - vec2<f32>(0.5);
+        color += castray(vec2<f32>(f32(screen_pos_u32.x) + coord.x * offset, f32(screen_pos_u32.y) + coord.y * offset));
+    }
+    color /= f32(numSamples);
     let screen_pos_i32 = vec2<i32>(screen_pos_u32);
     textureStore(color_buffer, screen_pos_i32, color);
+
+    // let offset = 0.5;
+    // var color = castray(vec2<f32>(screen_pos_u32));
+    // color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)-offset));
+    // color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)-offset));
+    // color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)+offset));
+    // color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)+offset));
+    // color /= 5.0;
+    //
+    // let screen_pos_i32 = vec2<i32>(screen_pos_u32);
+    // textureStore(color_buffer, screen_pos_i32, color);
+
+    // let color = hash32(vec2<f32>(screen_pos_u32));
+    // let screen_pos_i32 = vec2<i32>(screen_pos_u32);
+    // textureStore(color_buffer, screen_pos_i32, vec4<f32>(color, 1.0));
 }
 
 fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
@@ -145,9 +174,7 @@ fn raystart(screenPos: vec2<f32>) -> Ray {
 
     // Compute the ray direction
     let ray_dir = normalize(
-        ndc_x * aspect_ratio * fov_adjustment * camera.side +
-        ndc_y * fov_adjustment * camera.up +
-        camera.direction
+        ndc_x * aspect_ratio * fov_adjustment * camera.side + ndc_y * fov_adjustment * camera.up + camera.direction
     );
 
     return Ray(camera.position, ray_dir);
