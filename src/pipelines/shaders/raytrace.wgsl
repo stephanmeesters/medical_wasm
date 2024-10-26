@@ -22,6 +22,11 @@ struct Hit {
     normal: vec3<f32>
 }
 
+struct RayResult {
+    color: vec4<f32>,
+    hit: Hit
+}
+
 @group(0) @binding(0)
 var color_buffer: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(1)
@@ -83,11 +88,21 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
 fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
     var ray = raystart(screen_pos);
 
-    let sphere_pos = vec3<f32>(0.0, 0.0, 0.0);
-    let sphere_pos_2 = vec3<f32>(0.0, 0.0, -8.0);
-    let sphere_radius = 0.3;
-    let sphere_radius_2 = 0.8;
+    let result1 = castray_impl(ray);
+    if result1.hit.hit && dot(result1.hit.normal, ray.direction) < 0.0 { // second ray
+        let newray = Ray(result1.hit.p, result1.hit.normal);
+        let result2 = castray_impl(newray);
+        return 0.5 * result1.color + 0.5 * result2.color;
+    }
 
+    return result1.color;
+}
+
+fn castray_impl(ray: Ray) -> RayResult {
+    let sphere_pos = vec3<f32>(0.0, 0.0, 0.0);
+    let sphere_pos_2 = vec3<f32>(0.0, 0.0, -2.0);
+    let sphere_radius = 0.5;
+    let sphere_radius_2 = 0.5;
 
     var hit_anything = false;
     var closest = Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
@@ -105,10 +120,11 @@ fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
     }
 
     if hit_anything {
-        return vec4<f32>((closest.normal + 1.0) / 2.0, 1.0);
+        let color = vec4<f32>((closest.normal + 1.0) / 2.0, 1.0);
+        return RayResult(color, closest);
     }
-    
-    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+
+    return RayResult(vec4<f32>(0.0, 0.0, 0.0, 1.0), closest);
 }
 
 fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray, near: f32, far: f32) -> Hit {
