@@ -5,6 +5,7 @@ use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
 use winit::keyboard::KeyCode;
+use winit::platform::x11::WindowBuilderExtX11;
 use winit::window::{Window, WindowBuilder};
 
 use crate::renderer::Renderer;
@@ -14,6 +15,7 @@ pub async fn run() {
 
     let window = WindowBuilder::new()
         .with_title("wgpu test")
+        .with_inner_size(PhysicalSize::new(500, 500))
         .build(&event_loop).unwrap();
 
     App::new(&window).await.run(event_loop);

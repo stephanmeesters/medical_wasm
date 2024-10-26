@@ -15,12 +15,19 @@ struct Ray {
     direction: vec3<f32>,
 }
 
+struct Hit {
+    hit: bool,
+    t: f32,
+    p: vec3<f32>,
+    normal: vec3<f32>
+}
+
 @group(0) @binding(0)
 var color_buffer: texture_storage_2d<rgba8unorm, write>;
 @group(0) @binding(1)
 var<uniform> camera: CameraUniform;
 
-const fov: f32 = 1.6;
+const fov: f32 = 1;
 const screen_width: f32 = 1000.0;
 const screen_height: f32 = 1000.0;
 
@@ -31,6 +38,7 @@ const polygon_positions = array<vec3<f32>, 3>(
 );
 
 const numSamples: u32 = 100;
+const useAA: bool = true;
 
 fn hash22(p: vec2<f32>) -> vec2<f32> {
     var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
@@ -54,71 +62,80 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
         return;
     }
 
-    // take samples
-    var color: vec4<f32>;
-    let offset = 1.0;
-    for (var i: u32 = 0; i < numSamples; i = i + 1) {
-        let coord = hash22(vec2<f32>(f32(screen_pos_u32.x)*10000+f32(i)*123123, f32(screen_pos_u32.y)*100000+f32(i)*456456)) - vec2<f32>(0.5);
-        color += castray(vec2<f32>(f32(screen_pos_u32.x) + coord.x * offset, f32(screen_pos_u32.y) + coord.y * offset));
+    if useAA {
+        var color: vec4<f32>;
+        let offset = 1.0;
+        for (var i: u32 = 0; i < numSamples; i = i + 1) {
+            let coord = hash22(vec2<f32>(f32(screen_pos_u32.x) * 10000 + f32(i) * 123123, f32(screen_pos_u32.y) * 100000 + f32(i) * 456456)) - vec2<f32>(0.5);
+            color += castray(vec2<f32>(f32(screen_pos_u32.x) + coord.x * offset, f32(screen_pos_u32.y) + coord.y * offset));
+        }
+        color /= f32(numSamples);
+        let screen_pos_i32 = vec2<i32>(screen_pos_u32);
+        textureStore(color_buffer, screen_pos_i32, color);
+    } else {
+        let offset = 0.5;
+        var color = castray(vec2<f32>(screen_pos_u32));
+        let screen_pos_i32 = vec2<i32>(screen_pos_u32);
+        textureStore(color_buffer, screen_pos_i32, color);
     }
-    color /= f32(numSamples);
-    let screen_pos_i32 = vec2<i32>(screen_pos_u32);
-    textureStore(color_buffer, screen_pos_i32, color);
-
-    // let offset = 0.5;
-    // var color = castray(vec2<f32>(screen_pos_u32));
-    // color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)-offset));
-    // color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)-offset));
-    // color += castray(vec2<f32>(f32(screen_pos_u32.x)-offset, f32(screen_pos_u32.y)+offset));
-    // color += castray(vec2<f32>(f32(screen_pos_u32.x)+offset, f32(screen_pos_u32.y)+offset));
-    // color /= 5.0;
-    //
-    // let screen_pos_i32 = vec2<i32>(screen_pos_u32);
-    // textureStore(color_buffer, screen_pos_i32, color);
-
-    // let color = hash32(vec2<f32>(screen_pos_u32));
-    // let screen_pos_i32 = vec2<i32>(screen_pos_u32);
-    // textureStore(color_buffer, screen_pos_i32, vec4<f32>(color, 1.0));
 }
 
 fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
     var ray = raystart(screen_pos);
 
     let sphere_pos = vec3<f32>(0.0, 0.0, 0.0);
+    let sphere_pos_2 = vec3<f32>(0.0, 0.0, -8.0);
     let sphere_radius = 0.3;
+    let sphere_radius_2 = 0.8;
 
-    var color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
-    // Check for intersection with the triangle
-    let t_triangle = intersectTriangle(ray, polygon_positions[0], polygon_positions[1], polygon_positions[2]);
-    if t_triangle > 0.0 {
-        let intersection_point = ray.start + ray.direction * t_triangle;
-        let bary_coords = computeBarycentricCoords(intersection_point, polygon_positions[0], polygon_positions[1], polygon_positions[2]);
-        color = vec4<f32>(bary_coords, 1.0);
-    } else {
-        // Check for intersection with the sphere
-        let t_sphere = hit_sphere(sphere_pos, sphere_radius, ray);
-        if t_sphere > 0.0 {
-            let N = normalize((ray.start + ray.direction * t_sphere) - sphere_pos);
-            color = vec4<f32>((N + 1.0) / 2.0, 1.0);
+    var hit_anything = false;
+    var closest = Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
+
+    let hit_sphere = hit_sphere(sphere_pos, sphere_radius, ray, 1.0, 1000.0);
+    if hit_sphere.hit {
+        closest = hit_sphere;
+        hit_anything = true;
+    }
+
+    let hit_sphere_2 = hit_sphere(sphere_pos_2, sphere_radius_2, ray, 1.0, 1000.0);
+    if hit_sphere_2.hit && (!hit_anything || hit_sphere_2.t < closest.t) {
+        closest = hit_sphere_2;
+        hit_anything = true;
+    }
+
+    if hit_anything {
+        return vec4<f32>((closest.normal + 1.0) / 2.0, 1.0);
+    }
+    
+    return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+}
+
+fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray, near: f32, far: f32) -> Hit {
+    let oc = center - r.start;
+    let a = dot(r.direction, r.direction);
+    let h = dot(oc, r.direction);
+    let c = dot(oc, oc) - radius * radius;
+    let discriminant = h * h - a * c;
+
+    if discriminant < 0.0 {
+        return Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
+    }
+
+    let sqrtd = sqrt(discriminant);
+    var root = (h - sqrtd) / a;
+
+    if root <= near || root >= far {
+        root = (h + sqrtd) / a;
+        if root <= near || root >= far {
+            return Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
         }
     }
 
-    return color;
-}
+    let p = r.start + r.direction * root;
+    let normal = normalize(p - center);
 
-fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray) -> f32 {
-    let oc = r.start - center;
-    let a = dot(r.direction, r.direction);
-    let b = 2.0 * dot(oc, r.direction);
-    let c = dot(oc, oc) - radius * radius;
-    let discriminant = b * b - 4.0 * a * c;
-
-    if discriminant < 0.0 {
-        return -1.0;
-    } else {
-        return (-b - sqrt(discriminant)) / (2.0 * a);
-    }
+    return Hit(true, root, p, normal);
 }
 
 fn intersectTriangle(ray: Ray, v0: vec3<f32>, v1: vec3<f32>, v2: vec3<f32>) -> f32 {
