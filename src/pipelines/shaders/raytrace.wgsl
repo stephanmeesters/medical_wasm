@@ -19,12 +19,19 @@ struct Hit {
     hit: bool,
     t: f32,
     p: vec3<f32>,
-    normal: vec3<f32>
+    normal: vec3<f32>,
+    center: vec3<f32>
 }
 
 struct RayResult {
     color: vec4<f32>,
     hit: Hit
+}
+
+struct Sphere {
+    pos: vec3<f32>,
+    radius: f32,
+    material: vec4<f32> 
 }
 
 @group(0) @binding(0)
@@ -42,8 +49,15 @@ const polygon_positions = array<vec3<f32>, 3>(
     vec3<f32>(0.0, -0.5, 0.0),
 );
 
-const numSamples: u32 = 100;
+const numSamples: u32 = 10;
 const useAA: bool = true;
+const numBounceSamples: u32 = 10;
+
+const NUM_SPHERES:u32 = 2;
+const spheres: array<Sphere, NUM_SPHERES> = array<Sphere, 2>(
+    Sphere(vec3<f32>(0.0, 0.0, 0.0), 0.5, vec4<f32>(1.0, 0.0, 0.0, 1.0)),
+    Sphere(vec3<f32>(0.0, 0.0, -2.0), 1.0, vec4<f32>(1.0, 1.0, 1.0, 1.0))
+);
 
 fn hash22(p: vec2<f32>) -> vec2<f32> {
     var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
@@ -55,6 +69,21 @@ fn hash32(p: vec2<f32>) -> vec3<f32> {
     var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
     p3 += dot(p3, p3.yxz + 33.33);
     return fract((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+fn hash33(p: vec3<f32>) -> vec3<f32> {
+    var p3 = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return fract((p3.xxy + p3.yxx) * p3.zyx);
+}
+
+fn get_rand_vector_aligned(p: vec3<f32>, i: u32) -> vec3<f32> {
+    let offset = vec3<f32>(i);
+    let sample = hash33(p + offset);
+    if dot(p, sample) > 0.0 {
+        return sample;
+    }
+    return -sample;
 }
 
 @compute @workgroup_size(8, 8, 1)
@@ -90,41 +119,55 @@ fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
 
     let result1 = castray_impl(ray);
     if result1.hit.hit && dot(result1.hit.normal, ray.direction) < 0.0 { // second ray
-        let newray = Ray(result1.hit.p, result1.hit.normal);
-        let result2 = castray_impl(newray);
-        return 0.5 * result1.color + 0.5 * result2.color;
+
+        // var color: vec4<f32> = result1.color;
+        // let newray = Ray(result1.hit.p, result1.hit.normal);
+        // let newresult = castray_impl(newray);
+        // if newresult.hit.hit {
+        //     color = newresult.color;
+        // }
+
+        var color: vec4<f32> = result1.color;
+        var count = 1;
+        for (var i: u32 = 0; i < numBounceSamples; i = i + 1) {
+            let rand = get_rand_vector_aligned(result1.hit.normal, i*1000);
+            let newray = Ray(result1.hit.p, sphere_normal(rand + result1.hit.p, result1.hit.center));
+            let newresult = castray_impl(newray);
+            if newresult.hit.hit {
+                color += newresult.color;
+                count = count + 1;
+            }
+        }
+        color /= f32(count);
+
+        return color;
     }
 
     return result1.color;
 }
 
 fn castray_impl(ray: Ray) -> RayResult {
-    let sphere_pos = vec3<f32>(0.0, 0.0, 0.0);
-    let sphere_pos_2 = vec3<f32>(0.0, 0.0, -2.0);
-    let sphere_radius = 0.5;
-    let sphere_radius_2 = 0.5;
 
     var hit_anything = false;
-    var closest = Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
+    var closest = Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
+    var material = vec4<f32>(137.0 / 255.0, 207.0 / 255.0, 240.0 / 255.0, 1.0);
 
-    let hit_sphere = hit_sphere(sphere_pos, sphere_radius, ray, 1.0, 1000.0);
-    if hit_sphere.hit {
-        closest = hit_sphere;
-        hit_anything = true;
-    }
-
-    let hit_sphere_2 = hit_sphere(sphere_pos_2, sphere_radius_2, ray, 1.0, 1000.0);
-    if hit_sphere_2.hit && (!hit_anything || hit_sphere_2.t < closest.t) {
-        closest = hit_sphere_2;
-        hit_anything = true;
+    for(var i = 0u; i < NUM_SPHERES; i = i + 1u)
+    {
+        let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.001, 1000.0);
+        if hit_sphere.hit {
+            closest = hit_sphere;
+            hit_anything = true;
+            material = spheres[i].material;
+        }
     }
 
     if hit_anything {
-        let color = vec4<f32>((closest.normal + 1.0) / 2.0, 1.0);
+        let color = material;
         return RayResult(color, closest);
     }
 
-    return RayResult(vec4<f32>(0.0, 0.0, 0.0, 1.0), closest);
+    return RayResult(material, closest);
 }
 
 fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray, near: f32, far: f32) -> Hit {
@@ -135,7 +178,7 @@ fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray, near: f32, far: f32) -> Hi
     let discriminant = h * h - a * c;
 
     if discriminant < 0.0 {
-        return Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
+        return Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0));
     }
 
     let sqrtd = sqrt(discriminant);
@@ -144,14 +187,18 @@ fn hit_sphere(center: vec3<f32>, radius: f32, r: Ray, near: f32, far: f32) -> Hi
     if root <= near || root >= far {
         root = (h + sqrtd) / a;
         if root <= near || root >= far {
-            return Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0));
+            return Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0));
         }
     }
 
     let p = r.start + r.direction * root;
     let normal = normalize(p - center);
 
-    return Hit(true, root, p, normal);
+    return Hit(true, root, p, normal, center);
+}
+
+fn sphere_normal(pos: vec3<f32>, center:vec3<f32>) -> vec3<f32> {
+    return -normalize(center - pos);
 }
 
 fn intersectTriangle(ray: Ray, v0: vec3<f32>, v1: vec3<f32>, v2: vec3<f32>) -> f32 {
