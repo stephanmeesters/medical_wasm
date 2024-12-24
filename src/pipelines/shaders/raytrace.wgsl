@@ -36,8 +36,13 @@ struct Sphere {
 
 @group(0) @binding(0)
 var color_buffer: texture_storage_2d<rgba8unorm, write>;
+
 @group(0) @binding(1)
 var<uniform> camera: CameraUniform;
+
+@group(0) @binding(2)
+var<storage> spheres: array<Sphere>;
+
 
 const fov: f32 = 1;
 const screen_width: f32 = 1000.0;
@@ -53,11 +58,11 @@ const numSamples: u32 = 10;
 const useAA: bool = true;
 const numBounceSamples: u32 = 10;
 
-const NUM_SPHERES:u32 = 2;
-const spheres: array<Sphere, NUM_SPHERES> = array<Sphere, 2>(
-    Sphere(vec3<f32>(0.0, 0.0, 0.0), 0.5, vec4<f32>(1.0, 0.0, 0.0, 1.0)),
-    Sphere(vec3<f32>(0.0, 0.0, -2.0), 1.0, vec4<f32>(1.0, 1.0, 1.0, 1.0))
-);
+// const NUM_SPHERES:u32 = 2;
+// const spheres: array<Sphere, NUM_SPHERES> = array<Sphere, 2>(
+//     Sphere(vec3<f32>(0.0, 0.0, 0.0), 0.5, vec4<f32>(1.0, 0.0, 0.0, 1.0)),
+//     Sphere(vec3<f32>(0.0, 0.0, -2.0), 1.0, vec4<f32>(1.0, 1.0, 1.0, 1.0))
+// );
 
 fn hash22(p: vec2<f32>) -> vec2<f32> {
     var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
@@ -131,7 +136,8 @@ fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
         var count = 1;
         for (var i: u32 = 0; i < numBounceSamples; i = i + 1) {
             let rand = get_rand_vector_aligned(result1.hit.normal, i*1000);
-            let newray = Ray(result1.hit.p, sphere_normal(rand + result1.hit.p, result1.hit.center));
+            let zz = result1.hit.p + result1.hit.normal;
+            let newray = Ray(result1.hit.p, sphere_normal(zz+rand,result1.hit.p));
             let newresult = castray_impl(newray);
             if newresult.hit.hit {
                 color += newresult.color;
@@ -149,16 +155,18 @@ fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
 fn castray_impl(ray: Ray) -> RayResult {
 
     var hit_anything = false;
-    var closest = Hit(false, 0.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
+    var closest = Hit(false, 9999999.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
     var material = vec4<f32>(137.0 / 255.0, 207.0 / 255.0, 240.0 / 255.0, 1.0);
 
-    for(var i = 0u; i < NUM_SPHERES; i = i + 1u)
+    for(var i = 0u; i < arrayLength(&spheres); i++)
     {
         let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.001, 1000.0);
         if hit_sphere.hit {
-            closest = hit_sphere;
             hit_anything = true;
-            material = spheres[i].material;
+            if hit_sphere.t < closest.t {
+                closest = hit_sphere;
+                material = spheres[i].material;
+            }
         }
     }
 

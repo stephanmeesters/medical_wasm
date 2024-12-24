@@ -1,9 +1,18 @@
 use crate::camera::Camera;
+use wgpu::util::DeviceExt;
 
 pub struct RaytracePipeline {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group: wgpu::BindGroup,
     pub texture: wgpu::Texture
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct Sphere {
+    pos: [f32; 3],
+    radius: f32,
+    material: [f32; 4] 
 }
 
 impl RaytracePipeline {
@@ -12,6 +21,18 @@ impl RaytracePipeline {
     }
 
     pub fn new(device: &wgpu::Device, camera: &Camera) -> Self {
+
+        let spheres: [Sphere; 2] = [
+            Sphere { pos: [0.0, 0.0, 0.0], radius:0.5, material: [1.0, 0.0, 0.0, 1.0]},
+            Sphere { pos: [0.0, 0.0, -2.0], radius:1.0, material: [1.0, 1.0, 1.0, 1.0]},
+        ];
+
+        let spheres_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Spheres Buffer"),
+            contents: bytemuck::cast_slice(&spheres),
+            usage: wgpu::BufferUsages::STORAGE
+        });
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/raytrace.wgsl").into()),
@@ -38,7 +59,8 @@ impl RaytracePipeline {
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("ray bind group layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
+            entries: &[
+            wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::COMPUTE,
                 ty: wgpu::BindingType::StorageTexture {
@@ -57,7 +79,17 @@ impl RaytracePipeline {
                     min_binding_size: None
                 },
                 count: None,
-            }],
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None
+                },
+                count: None,
+            }]
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -70,6 +102,10 @@ impl RaytracePipeline {
             wgpu::BindGroupEntry {
                 binding: 1,
                 resource: camera.buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: spheres_buffer.as_entire_binding(),
             }],
         });
 
