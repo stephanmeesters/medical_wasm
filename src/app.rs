@@ -1,11 +1,10 @@
-use std::time::{Duration};
+use std::time::Duration;
 
 use instant::Instant;
 use winit::dpi::PhysicalSize;
 use winit::event::{Event, KeyEvent, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
 use winit::keyboard::KeyCode;
-use winit::platform::x11::WindowBuilderExtX11;
 use winit::window::{Window, WindowBuilder};
 
 use crate::renderer::Renderer;

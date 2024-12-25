@@ -43,6 +43,7 @@ var<uniform> camera: CameraUniform;
 @group(0) @binding(2)
 var<storage> spheres: array<Sphere>;
 
+var<workgroup> counter: atomic<u32>;
 
 const fov: f32 = 1;
 const screen_width: f32 = 1000.0;
@@ -55,14 +56,8 @@ const polygon_positions = array<vec3<f32>, 3>(
 );
 
 const numSamples: u32 = 10;
-const useAA: bool = true;
+const useAA: bool = false;
 const numBounceSamples: u32 = 10;
-
-// const NUM_SPHERES:u32 = 2;
-// const spheres: array<Sphere, NUM_SPHERES> = array<Sphere, 2>(
-//     Sphere(vec3<f32>(0.0, 0.0, 0.0), 0.5, vec4<f32>(1.0, 0.0, 0.0, 1.0)),
-//     Sphere(vec3<f32>(0.0, 0.0, -2.0), 1.0, vec4<f32>(1.0, 1.0, 1.0, 1.0))
-// );
 
 fn hash22(p: vec2<f32>) -> vec2<f32> {
     var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
@@ -80,6 +75,20 @@ fn hash33(p: vec3<f32>) -> vec3<f32> {
     var p3 = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
     p3 += dot(p3, p3.yxz + 33.33);
     return fract((p3.xxy + p3.yxx) * p3.zyx);
+}
+
+fn rand_f(state: ptr<function, u32>) -> f32 {
+    *state = *state * 747796405u + 2891336453u;
+    let word = ((*state >> ((*state >> 28u) + 4u)) ^ *state) * 277803737u;
+    return f32((word >> 22u) ^ word) * bitcast<f32>(0x2f800004u);
+}
+
+fn rand_vec2f(state: ptr<function, u32>) -> vec2<f32> {
+    return vec2(rand_f(state), rand_f(state));
+}
+
+fn rand_vec3f(state: ptr<function, u32>) -> vec3<f32> {
+    return vec3(rand_f(state), rand_f(state), rand_f(state));
 }
 
 fn get_rand_vector_aligned(p: vec3<f32>, i: u32) -> vec3<f32> {
@@ -101,25 +110,31 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
         return;
     }
 
+    counter = counter + 1;
+    var rng = screen_pos_u32.x + screen_pos_u32.y * 1000u + counter * 5782582u;
+
     if useAA {
         var color: vec4<f32>;
         let offset = 1.0;
         for (var i: u32 = 0; i < numSamples; i = i + 1) {
-            let coord = hash22(vec2<f32>(f32(screen_pos_u32.x) * 10000 + f32(i) * 123123, f32(screen_pos_u32.y) * 100000 + f32(i) * 456456)) - vec2<f32>(0.5);
-            color += castray(vec2<f32>(f32(screen_pos_u32.x) + coord.x * offset, f32(screen_pos_u32.y) + coord.y * offset));
+            let coord = rand_vec2f(&rng) - vec2<f32>(0.5);
+            color += castray(
+                vec2<f32>(f32(screen_pos_u32.x) + coord.x * offset,
+                f32(screen_pos_u32.y) + coord.y * offset),
+                &rng);
         }
         color /= f32(numSamples);
         let screen_pos_i32 = vec2<i32>(screen_pos_u32);
         textureStore(color_buffer, screen_pos_i32, color);
     } else {
         let offset = 0.5;
-        var color = castray(vec2<f32>(screen_pos_u32));
+        var color = castray(vec2<f32>(screen_pos_u32), &rng);
         let screen_pos_i32 = vec2<i32>(screen_pos_u32);
         textureStore(color_buffer, screen_pos_i32, color);
     }
 }
 
-fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
+fn castray(screen_pos: vec2<f32>, rng: ptr<function, u32>) -> vec4<f32> {
     var ray = raystart(screen_pos);
 
     let result1 = castray_impl(ray);
@@ -135,7 +150,8 @@ fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
         var color: vec4<f32> = result1.color;
         var count = 1;
         for (var i: u32 = 0; i < numBounceSamples; i = i + 1) {
-            let rand = get_rand_vector_aligned(result1.hit.normal, i*1000);
+                // let rand = normalize(get_rand_vector_aligned(result1.hit.normal, i*1000));
+            let rand = rand_vec3f(rng);
             let zz = result1.hit.p + result1.hit.normal;
             let newray = Ray(result1.hit.p, sphere_normal(zz+rand,result1.hit.p));
             let newresult = castray_impl(newray);
@@ -160,7 +176,7 @@ fn castray_impl(ray: Ray) -> RayResult {
 
     for(var i = 0u; i < arrayLength(&spheres); i++)
     {
-        let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.001, 1000.0);
+        let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.01, 1000.0);
         if hit_sphere.hit {
             hit_anything = true;
             if hit_sphere.t < closest.t {
