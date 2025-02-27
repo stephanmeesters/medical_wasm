@@ -14,7 +14,7 @@ pub async fn run() {
 
     let window = WindowBuilder::new()
         .with_title("wgpu test")
-        .with_inner_size(PhysicalSize::new(500, 500))
+        .with_inner_size(PhysicalSize::new(1000, 1000))
         .build(&event_loop).unwrap();
 
     App::new(&window).await.run(event_loop);

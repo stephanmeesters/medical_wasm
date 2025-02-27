@@ -82,7 +82,7 @@ impl Camera {
         });
 
         Self {
-            eye: (0.0, 0.0, 5.0).into(),
+            eye: (0.0, 0.0, 1.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect: surface_config.width as f32 / surface_config.height as f32,
@@ -99,11 +99,11 @@ impl Camera {
     }
 
     fn build_view_projection_matrix(&mut self) -> cgmath::Matrix4<f32> {
-        self.t += 1.0;
+        // self.t += 1.0;
         self.rot = f32::sin(self.t * 0.01)*2.5;
         // let mut dist = 3.0 + 1.0 * f32::sin(self.rot);
         // dist *= 0.5;
-        let dist = 5.0;
+        let dist = 1.0;
         let elev = 0.0;
         self.eye = cgmath::point3(f32::sin(self.rot) * dist, elev, f32::cos(self.rot) * dist);
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);

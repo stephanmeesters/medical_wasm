@@ -56,7 +56,7 @@ const polygon_positions = array<vec3<f32>, 3>(
 );
 
 const numSamples: u32 = 10;
-const useAA: bool = false;
+const useAA: bool = true;
 const numBounceSamples: u32 = 10;
 
 fn hash22(p: vec2<f32>) -> vec2<f32> {
