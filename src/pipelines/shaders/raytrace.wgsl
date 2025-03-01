@@ -71,7 +71,7 @@ const polygon_positions = array<vec3<f32>, 3>(
 const numSamples: u32 = 10;
 const useAA: bool = true;
 const numBounceSamples: u32 = 10;
-const scattering: f32 = 0.3;
+const scattering: f32 = 0.0;
 
 fn hash22(p: vec2<f32>) -> vec2<f32> {
     var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
@@ -155,34 +155,28 @@ fn castray(screen_pos: vec2<f32>, rng: ptr<function, u32>) -> vec4<f32> {
     let result1 = castray_impl(ray);
     if result1.hit.hit && dot(result1.hit.normal, ray.direction) < 0.0 { // second ray
 
-        // var color: vec4<f32>;
-        // let newray = Ray(result1.hit.p, result1.hit.normal);
-        // let newresult = castray_impl(newray);
-        // if newresult.hit.hit {
-        //     color = newresult.color;
-        // }
-
         var color: vec4<f32> = result1.color;
         var count = 1;
         for (var i: u32 = 0; i < numBounceSamples; i = i + 1) {
             let rand = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
             let zz = result1.hit.p + result1.hit.normal + scattering * rand;
             let newray = Ray(result1.hit.p, -normalize(result1.hit.p - zz));
-            // let newray = Ray(result1.hit.p, sphere_normal(zz + rand, result1.hit.p));
             let newresult = castray_impl(newray);
             if newresult.hit.hit {
                 color += newresult.color;
                 count = count + 1;
+
+                let rand2 = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
+                let zz2 = newresult.hit.p + newresult.hit.normal + scattering * rand2;
+                let newray2 = Ray(newresult.hit.p, -normalize(newresult.hit.p - zz2));
+                let newresult2 = castray_impl(newray2);
+                if newresult2.hit.hit {
+                    color += newresult2.color;
+                    count = count + 1;
+                }
             }
-        // else {
-        //         color += vec4<f32>(137.0 / 255.0, 207.0 / 255.0, 240.0 / 255.0, 1.0);
-        //         count = count + 1;
-        //     }
         }
         color /= f32(count);
-
-        // blend
-        // color = result1.color * 0.2 + color * 0.8;
 
         return color;
     }

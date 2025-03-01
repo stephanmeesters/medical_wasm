@@ -26,8 +26,8 @@ impl RaytracePipeline {
 
         let spheres = vec![
             Sphere { pos: [-0.5, 0.0, -1.0], radius:0.5, material: [1.0, 0.0, 0.0, 1.0]},
-            Sphere { pos: [0.5, 0.0, 0.0], radius:0.5, material: [1.0, 1.0, 0.0, 1.0]},
-            Sphere { pos: [0.0, -100.5, -1.0], radius:100.0, material: [1.0, 1.0, 1.0, 1.0]},
+            Sphere { pos: [0.5, 0.0, 0.0], radius:0.5, material: [0.0, 0.0, 1.0, 1.0]},
+            Sphere { pos: [0.0, -25.5, -1.0], radius:25.0, material: [1.0, 1.0, 1.0, 1.0]},
         ];
 
         let spheres_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
