@@ -25,8 +25,8 @@ impl RaytracePipeline {
             camera: &Camera) -> Self {
 
         let spheres = vec![
-            Sphere { pos: [0.0, 0.0, -1.0], radius:0.5, material: [1.0, 0.0, 0.0, 1.0]},
-            Sphere { pos: [2.0, 0.0, -1.0], radius:0.5, material: [1.0, 1.0, 0.0, 1.0]},
+            Sphere { pos: [-0.5, 0.0, -1.0], radius:0.5, material: [1.0, 0.0, 0.0, 1.0]},
+            Sphere { pos: [0.5, 0.0, 0.0], radius:0.5, material: [1.0, 1.0, 0.0, 1.0]},
             Sphere { pos: [0.0, -100.5, -1.0], radius:100.0, material: [1.0, 1.0, 1.0, 1.0]},
         ];
 

@@ -179,18 +179,20 @@ impl<'a> Renderer<'a> {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if width > 0 && height > 0 {
-            self.surface_config.width = width;
-            self.surface_config.height = height;
-            self.surface.configure(&self.device, &self.surface_config);
-
-            self.multisample_framebuffer =
-                Renderer::create_multisampled_framebuffer(&self.device, &self.surface_config, 4);
-            self.depthbuffer =
-                Renderer::create_depthbuffer(&self.device, &self.surface_config);
-
-            self.camera = Camera::new(&self.device, &self.surface_config);
-            self.pipelines = Pipelines::new(&self.surface_config, &self.device, &self.camera);
+        if width <= 0 && height <= 0 {
+            return;
         }
+
+        self.surface_config.width = width;
+        self.surface_config.height = height;
+        self.surface.configure(&self.device, &self.surface_config);
+
+        self.multisample_framebuffer =
+            Renderer::create_multisampled_framebuffer(&self.device, &self.surface_config, 4);
+        self.depthbuffer =
+            Renderer::create_depthbuffer(&self.device, &self.surface_config);
+
+        self.camera = Camera::new(&self.device, &self.surface_config);
+        self.pipelines = Pipelines::new(&self.surface_config, &self.device, &self.camera);
     }
 }

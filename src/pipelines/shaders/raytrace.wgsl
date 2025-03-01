@@ -6,7 +6,7 @@ struct CameraUniform {
     v_axis: vec3<f32>, // camera "up"
     z_far: f32,
     w_axis: vec3<f32>, // camera looks "backwards"
-    _pad1: f32,
+    projection: u32,   // ortho: 0, projection: 1
     horizontal: vec3<f32>,
     _pad2: f32,
     vertical: vec3<f32>,
@@ -291,30 +291,24 @@ fn computeBarycentricCoords(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f3
 
 fn raystart(screenPos: vec2<f32>, rng: ptr<function, u32>) -> Ray {
 
-    let s = screenPos.x / details.screen_width;
+let s = screenPos.x / details.screen_width;
     let t = screenPos.y / details.screen_height;
 
-    let ray_target = camera.lower_left_corner + s * camera.horizontal + t * camera.vertical;
-    let random_disk = vec2<f32>(camera.lens_radius) * normalize(rand_vec2f(rng));
-    let lens_offset = camera.u_axis * random_disk.x + camera.v_axis * random_disk.y;
-
-    let origin = camera.eye + lens_offset;
-    let direction = normalize(ray_target - camera.eye);
-
-    return Ray(camera.eye, direction);
-
-    // // Normalized Device Coordinates (NDC)
-    // let ndc_x = (screenPos.x + 0.5) / screen_width * 2.0 - 1.0;
-    // let ndc_y = 1.0 - ((screenPos.y + 0.5) / screen_height * 2.0); // Flip Y-axis
-    //
-    // let aspect_ratio = screen_width / screen_height;
-    // let fov_adjustment = tan(fov / 2.0);
-    //
-    // // Compute the ray direction
-    // let ray_dir = normalize(
-    //     ndc_x * aspect_ratio * fov_adjustment * camera.side + ndc_y * fov_adjustment * camera.up + camera.direction
-    // );
-    //
-    // return Ray(camera.position, ray_dir);
-}
-
+    if camera.projection == 1 {
+        // ORTHO path
+        let origin = camera.lower_left_corner
+                     + s * camera.horizontal
+                     + t * camera.vertical;
+        let direction = normalize(-camera.w_axis); 
+        return Ray(origin, direction);
+    } else {
+        // PERSPECTIVE path (as in your code)
+        let ray_target = camera.lower_left_corner
+                        + s * camera.horizontal
+                        + t * camera.vertical;
+        let random_disk = vec2<f32>(camera.lens_radius) * normalize(rand_vec2f(rng));
+        let lens_offset = camera.u_axis * random_disk.x + camera.v_axis * random_disk.y;
+        let origin = camera.eye + lens_offset;
+        let direction = normalize(ray_target - camera.eye - lens_offset);
+        return Ray(origin, direction);
+    }}

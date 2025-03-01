@@ -11,7 +11,7 @@ pub struct CameraUniform {
     v_axis: [f32; 3], // camera "up"
     z_far: f32,
     w_axis: [f32; 3], // camera looks "backwards"
-    _pad1: f32,
+    projection: u32,
     horizontal: [f32; 3],
     _pad2: f32,
     vertical: [f32; 3],
@@ -33,7 +33,8 @@ impl CameraUniform {
             lens_radius: 0.0,
             z_near: 0.0,
             z_far: 0.0,
-            _pad1: 0.0,
+            projection: 0,
+
             _pad2: 0.0,
             _pad3: 0.0,
             _pad4: 0.0,
@@ -51,6 +52,7 @@ pub struct Camera {
     pub zfar: f32,
     pub aperture: f32,
     pub focus_distance: f32,
+    pub projection: Projection,
 
     pub uniform: CameraUniform,
     pub buffer: wgpu::Buffer,
@@ -58,6 +60,13 @@ pub struct Camera {
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub rot: f32,
     pub t: f32,
+}
+
+#[repr(u32)]
+#[derive(Clone)]
+pub enum Projection {
+    Orthograpic = 0,
+    Perspective = 1
 }
 
 impl Camera {
@@ -94,16 +103,18 @@ impl Camera {
         });
 
         Self {
-            eye: (0.0, 0.0, 0.5).into(),
+            eye: (0.0, 0.0, 3.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: -cgmath::Vector3::unit_y(),
             aspect: surface_config.width as f32 / surface_config.height as f32,
-            fovy: 60.0,
+            fovy: 45.0,
             znear: 1.0,
             zfar: 100.0,
             rot: 0.0,
             aperture: 0.5,
-            focus_distance: 102.0,
+            focus_distance: 1.0,
+            projection: Projection::Orthograpic,
+
             uniform,
             buffer,
             bind_group,
@@ -116,7 +127,8 @@ impl Camera {
 
         self.t += 0.01;
         // self.eye = (-self.t.sin()*1.0 - 1.0, self.t.sin()*1.0 + 1.0, self.t.sin()*1.0 + 2.0).into();
-        self.fovy = self.t.sin()*45.0 + 90.0;
+        // self.fovy = self.t.sin()*45.0 + 90.0;
+        self.focus_distance = self.t.sin()*0.5 + 3.5;
 
 
         let theta = self.fovy.to_radians();
@@ -139,6 +151,7 @@ impl Camera {
         self.uniform.horizontal = horizontal.into();
         self.uniform.vertical = vertical.into();
         self.uniform.lower_left_corner = lower_left_corner.into();
+        self.uniform.projection = self.projection.clone() as u32;
 
         queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
