@@ -1,23 +1,44 @@
 use cgmath::InnerSpace;
 use wgpu::util::DeviceExt;
 
-// #[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
-    1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 1.0,
-);
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct CameraUniform {
-    // model_view_proj: [[f32; 4]; 4], // 16x4 = 64
-    position: [f32; 3],
-    _pad1: f32,        // Padding of 4 bytes
-    direction: [f32; 3],
-    _pad2: f32,        // Padding of 4 bytes
-    up: [f32; 3],
-    _pad3: f32,        // Padding of 4 bytes
-    side: [f32; 3],
-    _pad4: f32,        // Padding of 4 bytes
+    eye: [f32; 3],
+    lens_radius: f32,
+    u_axis: [f32; 3], // camera "right"
+    z_near: f32,
+    v_axis: [f32; 3], // camera "up"
+    z_far: f32,
+    w_axis: [f32; 3], // camera looks "backwards"
+    _pad1: f32,
+    horizontal: [f32; 3],
+    _pad2: f32,
+    vertical: [f32; 3],
+    _pad3: f32,
+    lower_left_corner: [f32; 3],
+    _pad4: f32,
+}
+
+impl CameraUniform {
+    pub fn default() -> CameraUniform {
+        CameraUniform {
+            eye: (0.0, 0.0, 0.0).into(),
+            u_axis: (0.0, 0.0, 0.0).into(),
+            v_axis: (0.0, 0.0, 0.0).into(),
+            w_axis: (0.0, 0.0, 0.0).into(),
+            horizontal: (0.0, 0.0, 0.0).into(),
+            vertical: (0.0, 0.0, 0.0).into(),
+            lower_left_corner: (0.0, 0.0, 0.0).into(),
+            lens_radius: 0.0,
+            z_near: 0.0,
+            z_far: 0.0,
+            _pad1: 0.0,
+            _pad2: 0.0,
+            _pad3: 0.0,
+            _pad4: 0.0,
+        }
+    }
 }
 
 pub struct Camera {
@@ -28,29 +49,20 @@ pub struct Camera {
     pub fovy: f32,
     pub znear: f32,
     pub zfar: f32,
+    pub aperture: f32,
+    pub focus_distance: f32,
+
     pub uniform: CameraUniform,
     pub buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub rot: f32,
-    pub t: f32
+    pub t: f32,
 }
 
 impl Camera {
     pub fn new(device: &wgpu::Device, surface_config: &wgpu::SurfaceConfiguration) -> Self {
-        // use cgmath::SquareMatrix;
-        let uniform = CameraUniform {
-            // model_view_proj: cgmath::Matrix4::identity().into(),
-            direction: (0.0, 0.0, 5.0).into(),
-            position: (0.0, 0.0, 5.0).into(),
-            up: (0.0, 0.0, 1.0).into(),
-            side: (0.0, 0.0, 1.0).into(),
-            // padding: (0.0, 0.0, 0.0, 0.0).into()
-            _pad1: 0.0,
-            _pad2: 0.0,
-            _pad3: 0.0,
-            _pad4: 0.0,
-        };
+        let uniform = CameraUniform::default();
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
@@ -82,49 +94,52 @@ impl Camera {
         });
 
         Self {
-            eye: (0.0, 0.0, 1.0).into(),
+            eye: (0.0, 0.0, 0.5).into(),
             target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
+            up: -cgmath::Vector3::unit_y(),
             aspect: surface_config.width as f32 / surface_config.height as f32,
-            fovy: 45.0,
+            fovy: 60.0,
             znear: 1.0,
             zfar: 100.0,
             rot: 0.0,
+            aperture: 0.5,
+            focus_distance: 102.0,
             uniform,
             buffer,
             bind_group,
             bind_group_layout,
-            t: 0.0
+            t: 0.0,
         }
     }
 
-    fn build_view_projection_matrix(&mut self) -> cgmath::Matrix4<f32> {
-        // self.t += 1.0;
-        self.rot = f32::sin(self.t * 0.01)*2.5;
-        // let mut dist = 3.0 + 1.0 * f32::sin(self.rot);
-        // dist *= 0.5;
-        let dist = 1.0;
-        let elev = 0.0;
-        self.eye = cgmath::point3(f32::sin(self.rot) * dist, elev, f32::cos(self.rot) * dist);
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        proj * view
-        // println!("{:?}", view * cgmath::vec4(0.0, 0.0, 0.0, 1.0));
-        // view
-    }
-
     pub fn update(&mut self, queue: &wgpu::Queue) {
-        self.build_view_projection_matrix();
-        // self.uniform.model_view_proj = (OPENGL_TO_WGPU_MATRIX * self.build_view_projection_matrix()).into();
-        self.uniform.position = self.eye.into();
-        self.uniform.direction = (self.target - self.eye).normalize().into();
-        self.uniform.up = self.up.into();
-        self.uniform.side = self.up.cross(cgmath::vec3(self.eye.x, self.eye.y, self.eye.z)).normalize().into();
-        // println!("{:?}", self.uniform);
-        queue.write_buffer(
-            &self.buffer,
-            0,
-            bytemuck::cast_slice(&[self.uniform]),
-        );
+
+        self.t += 0.01;
+        // self.eye = (-self.t.sin()*1.0 - 1.0, self.t.sin()*1.0 + 1.0, self.t.sin()*1.0 + 2.0).into();
+        self.fovy = self.t.sin()*45.0 + 90.0;
+
+
+        let theta = self.fovy.to_radians();
+        let half_height = (theta * 0.5).tan();
+        let half_width = self.aspect * half_height;
+
+        let w_axis = (self.eye - self.target).normalize();
+        let u_axis = self.up.cross(w_axis).normalize();
+        let v_axis = w_axis.cross(u_axis);
+
+        let horizontal = 2.0 * half_width * self.focus_distance * u_axis;
+        let vertical = 2.0 * half_height * self.focus_distance * v_axis;
+        let lower_left_corner = self.eye - (horizontal * 0.5) - (vertical * 0.5) - (self.focus_distance * w_axis);
+        
+        self.uniform.w_axis = w_axis.into();
+        self.uniform.u_axis = u_axis.into();
+        self.uniform.v_axis = v_axis.into();
+        self.uniform.eye = self.eye.into();
+        self.uniform.lens_radius = self.aperture * 0.5;
+        self.uniform.horizontal = horizontal.into();
+        self.uniform.vertical = vertical.into();
+        self.uniform.lower_left_corner = lower_left_corner.into();
+
+        queue.write_buffer(&self.buffer, 0, bytemuck::cast_slice(&[self.uniform]));
     }
 }

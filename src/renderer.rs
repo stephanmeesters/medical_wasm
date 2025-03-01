@@ -188,6 +188,9 @@ impl<'a> Renderer<'a> {
                 Renderer::create_multisampled_framebuffer(&self.device, &self.surface_config, 4);
             self.depthbuffer =
                 Renderer::create_depthbuffer(&self.device, &self.surface_config);
+
+            self.camera = Camera::new(&self.device, &self.surface_config);
+            self.pipelines = Pipelines::new(&self.surface_config, &self.device, &self.camera);
         }
     }
 }

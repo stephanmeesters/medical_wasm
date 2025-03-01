@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 pub struct RaytracePipeline {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group: wgpu::BindGroup,
-    pub texture: wgpu::Texture
+    pub texture: wgpu::Texture,
 }
 
 #[repr(C)]
@@ -20,10 +20,13 @@ impl RaytracePipeline {
         self.texture.create_view(&Default::default())
     }
 
-    pub fn new(device: &wgpu::Device, camera: &Camera) -> Self {
+    pub fn new(surface_config: &wgpu::SurfaceConfiguration,
+            device: &wgpu::Device,
+            camera: &Camera) -> Self {
 
         let spheres = vec![
             Sphere { pos: [0.0, 0.0, -1.0], radius:0.5, material: [1.0, 0.0, 0.0, 1.0]},
+            Sphere { pos: [2.0, 0.0, -1.0], radius:0.5, material: [1.0, 1.0, 0.0, 1.0]},
             Sphere { pos: [0.0, -100.5, -1.0], radius:100.0, material: [1.0, 1.0, 1.0, 1.0]},
         ];
 
@@ -33,6 +36,15 @@ impl RaytracePipeline {
             usage: wgpu::BufferUsages::STORAGE
         });
 
+        let details = vec![surface_config.width as f32, surface_config.height as f32];
+        let details_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("details buffer"),
+            contents: bytemuck::cast_slice(&details),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        ////
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shaders/raytrace.wgsl").into()),
@@ -41,8 +53,8 @@ impl RaytracePipeline {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: None,
             size: wgpu::Extent3d {
-                width: 1000,
-                height: 1000,
+                width: surface_config.width,
+                height: surface_config.height,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -89,6 +101,16 @@ impl RaytracePipeline {
                     min_binding_size: None
                 },
                 count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None
+                },
+                count: None,
             }]
         });
 
@@ -106,6 +128,10 @@ impl RaytracePipeline {
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: spheres_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: details_buffer.as_entire_binding(),
             }],
         });
 

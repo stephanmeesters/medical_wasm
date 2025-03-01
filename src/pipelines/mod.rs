@@ -22,7 +22,7 @@ impl Pipelines {
         camera: &Camera,
     ) -> Self {
         // let mesh_pipeline = MeshPipeline::new(&surface_config, &device, &camera);
-        let raytrace_pipeline = RaytracePipeline::new(&device, &camera);
+        let raytrace_pipeline = RaytracePipeline::new(&surface_config, &device, &camera);
         let sample_pipeline = SampleTexturePipeline::new(&surface_config, &device, raytrace_pipeline.create_view());
 
         Pipelines {
