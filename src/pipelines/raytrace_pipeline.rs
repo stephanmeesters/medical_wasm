@@ -45,9 +45,13 @@ impl RaytracePipeline {
 
         ////
 
+        let shader_common_src = include_str!("shaders/common.wgsl");
+        let shader_raytracing_src = include_str!("shaders/raytrace.wgsl");
+        let shader_combined = format!("{}\n{}", shader_common_src, shader_raytracing_src);
+
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("shaders/raytrace.wgsl").into()),
+            source: wgpu::ShaderSource::Wgsl(shader_combined.into()),
         });
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
