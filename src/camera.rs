@@ -103,7 +103,7 @@ impl Camera {
         });
 
         Self {
-            eye: (0.0, 0.0, 3.0).into(),
+            eye: (0.0, 1.0, 3.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: -cgmath::Vector3::unit_y(),
             aspect: surface_config.width as f32 / surface_config.height as f32,
@@ -113,7 +113,7 @@ impl Camera {
             rot: 0.0,
             aperture: 0.5,
             focus_distance: 1.0,
-            projection: Projection::Orthograpic,
+            projection: Projection::Perspective,
 
             uniform,
             buffer,

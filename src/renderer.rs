@@ -1,11 +1,12 @@
 use std::iter;
+use std::sync::Arc;
 
 use winit::window::Window;
 
 use crate::{camera::Camera, fpscounter::FPSCounter, pipelines::Pipelines};
 
-pub struct Renderer<'a> {
-    surface: wgpu::Surface<'a>,
+pub struct Renderer {
+    surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -16,8 +17,8 @@ pub struct Renderer<'a> {
     camera: Camera,
 }
 
-impl<'a> Renderer<'a> {
-    pub async fn new(window: &'a Window) -> Self {
+impl Renderer {
+    pub async fn new(window: Arc<Window>) -> Self {
         let mut size = window.inner_size();
         size.width = size.width.max(1);
         size.height = size.height.max(1);
@@ -43,8 +44,8 @@ impl<'a> Renderer<'a> {
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                     memory_hints: wgpu::MemoryHints::Performance,
-                },
-                None,
+                    trace: wgpu::Trace::Off,
+                }
             )
             .await
             .expect("cant create device");

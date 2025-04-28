@@ -55,3 +55,18 @@ fn computeBarycentricCoords(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f3
     return vec3<f32>(u, v, w);
 }
 
+fn linear_to_gamma(c: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>(
+        linear_to_gamma_comp(c.r),
+        linear_to_gamma_comp(c.g),
+        linear_to_gamma_comp(c.b),
+        c.a);
+}
+
+fn linear_to_gamma_comp(c: f32) -> f32 {
+    if c <= 0.0 {
+        return 0.0;
+    }
+    return sqrt(c);
+}
+

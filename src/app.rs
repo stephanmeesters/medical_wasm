@@ -1,109 +1,92 @@
-use std::time::Duration;
+use std::sync::Arc;
+use pollster::FutureExt;
 
 use instant::Instant;
+use std::time::Duration;
+
+use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{Event, KeyEvent, WindowEvent};
-use winit::event_loop::{EventLoop, EventLoopWindowTarget};
-use winit::keyboard::KeyCode;
-use winit::window::{Window, WindowBuilder};
+use winit::event::{ElementState, KeyEvent, StartCause, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::keyboard::Key;
+use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::renderer::Renderer;
 
-pub async fn run() {
+pub fn run() -> Result<(), impl std::error::Error> {
     let event_loop = EventLoop::new().unwrap();
-
-    let window = WindowBuilder::new()
-        .with_title("wgpu test")
-        .with_inner_size(PhysicalSize::new(1000, 1000))
-        .build(&event_loop).unwrap();
-
-    App::new(&window).await.run(event_loop);
+    let mut app = MedicalApp::default();
+    event_loop.run_app(&mut app)
 }
 
-struct App<'a> {
-    window: &'a Window,
-    renderer: Renderer<'a>,
-    last_update: Instant
+#[derive(Default)]
+struct MedicalApp {
+    close_requested: bool,
+    last_update: Option<Instant>,
+    window: Option<Arc<Window>>,
+    renderer: Option<Renderer>
 }
 
-impl<'a> App<'a> {
-    pub async fn new(window: &'a Window) -> Self {
-        let renderer = Renderer::new(window).await;
-        let last_update = Instant::now();
-        Self {
-            window,
-            renderer,
-            last_update
-        }
+impl ApplicationHandler for MedicalApp {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: StartCause) {
     }
 
-    pub fn run(&mut self, event_loop: EventLoop<()>) {
-        event_loop.run(move |event, elwt| {
-
-            // while let Some(gilrs::Event { event, .. }) = self.gilrs.next_event() {
-            //     self.input_manager.gilrs_update(&event);
-            // }
-
-            match event {
-                Event::WindowEvent {
-                    ref event,
-                    window_id,
-                } if window_id == self.window.id() => {
-                    self.handle_window_event(event, elwt);
-                },
-                _ => {}
-            }
-        }).unwrap();
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let window_attributes = WindowAttributes::default().with_title(
+            "Medical App (FPS: ?)",
+        ).with_inner_size(PhysicalSize::new(1000, 1000));
+        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        self.window = Some(window.clone());
+        self.renderer = Some(Renderer::new(window.clone()).block_on());
+        self.last_update = Some(Instant::now());
     }
 
-    pub fn handle_window_event(&mut self, event: &WindowEvent, elwt: &EventLoopWindowTarget<()>) {
-        // let event_response = self.ui.egui_state_mut().on_window_event(self.window, event);
-        //
-        // if event_response.repaint {
-        //     self.window.request_redraw();
-        // }
-
+    fn window_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
         match event {
-            WindowEvent::CloseRequested => elwt.exit(),
-            WindowEvent::Resized(size) => self.resize(size),
-            WindowEvent::RedrawRequested => self.render(),
-            WindowEvent::KeyboardInput { event: key_event, ..} => {
-                self.keyboard_input(key_event, elwt)
+            WindowEvent::CloseRequested => {
+                self.close_requested = true;
             },
-            WindowEvent::MouseWheel { .. } |
-            WindowEvent::MouseInput { .. } |
-            WindowEvent::CursorMoved { .. } => {}, 
-                // self.input_manager.window_update(event, event_response.consumed),
-            _ => {}
+            WindowEvent::KeyboardInput {
+                event: KeyEvent { logical_key: key, state: ElementState::Pressed, .. },
+                ..
+            } => match key.as_ref() {
+                Key::Character("Q") | Key::Character("q") => {
+                    self.close_requested = true;
+                },
+                _ => (),
+            },
+        WindowEvent::RedrawRequested => {
+                let window = self.window.as_ref().unwrap();
+                window.pre_present_notify();
+            },
+            _ => (),
         }
     }
 
-    fn render(&mut self) {
-        pollster::block_on(async move {
-            self.renderer.update();
-            let _ = self.renderer.render().await;
-            if self.last_update.elapsed() > Duration::from_secs(1) {
-                let fps = self.renderer.get_fps();
-                self.window.set_title(&format!("Fps: {}", fps));
-                self.last_update = Instant::now();
-            }
-            self.window.request_redraw();
-        });
-    }
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        pollster::block_on(async {
+            let renderer = self.renderer.as_mut().unwrap();
+            let window = self.window.as_ref().unwrap();
 
-    fn resize(&mut self, size: &PhysicalSize<u32>) {
-        self.renderer.resize(size.width, size.height);
-    }
-
-    fn keyboard_input(&mut self, event: &KeyEvent, elwt: &EventLoopWindowTarget<()>) {
-        match event.physical_key {
-            winit::keyboard::PhysicalKey::Code(keycode) => {
-                if keycode == KeyCode::KeyQ {
-                    elwt.exit();
+            renderer.update();
+            let _ = renderer.render().await;
+            if let Some(last_update) = self.last_update {
+                if last_update.elapsed() > Duration::from_secs(1) {
+                    let fps = self.renderer.as_ref().unwrap().get_fps();
+                    window.set_title(&format!("Medical App (FPS: {})", fps));
+                    self.last_update = Some(Instant::now());
                 }
-            },
-            _ => ()
+            }
+            window.request_redraw();
+        });
+
+        if self.close_requested {
+            event_loop.exit();
         }
     }
 }
-

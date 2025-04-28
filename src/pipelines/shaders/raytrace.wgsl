@@ -28,15 +28,26 @@ struct Hit {
     center: vec3<f32>
 }
 
+struct ScatterRecord {
+    scatteredRay: Ray,
+    attenuation: f32
+}
+
+struct Material {
+    albedo: vec4<f32>,
+    emission: vec4<f32>,
+    roughness: f32
+}
+
 struct RayResult {
-    color: vec4<f32>,
+    material: Material,
     hit: Hit
 }
 
 struct Sphere {
     pos: vec3<f32>,
     radius: f32,
-    material: vec4<f32> 
+    material: Material
 }
 
 struct Details {
@@ -61,6 +72,7 @@ var<workgroup> counter: atomic<u32>;
 const numSamples: u32 = 10;
 const useAA: bool = true;
 const numBounceSamples: u32 = 10;
+const numBounces: u32 = 3;
 const scattering: f32 = 0.0;
 
 ////
@@ -78,8 +90,8 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     counter = counter + 1;
     var rng = screen_pos_u32.x + screen_pos_u32.y * 1000u + counter * 5782582u;
 
+    var color: vec4<f32>;
     if useAA {
-        var color: vec4<f32>;
         let offset = 1.0;
         for (var i: u32 = 0; i < numSamples; i = i + 1) {
             let coord = rand_vec2f(&rng) - vec2<f32>(0.5);
@@ -90,59 +102,56 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
             );
         }
         color /= f32(numSamples);
-        let screen_pos_i32 = vec2<i32>(screen_pos_u32);
-        textureStore(color_buffer, screen_pos_i32, color);
     } else {
-        let offset = 0.5;
-        var color = castray(vec2<f32>(screen_pos_u32), &rng);
-        let screen_pos_i32 = vec2<i32>(screen_pos_u32);
-        textureStore(color_buffer, screen_pos_i32, color);
+        color = castray(vec2<f32>(screen_pos_u32), &rng);
     }
+
+    color = linear_to_gamma(color);
+    let screen_pos_i32 = vec2<i32>(screen_pos_u32);
+    textureStore(color_buffer, screen_pos_i32, color);
 }
 
 fn castray(screen_pos: vec2<f32>, rng: ptr<function, u32>) -> vec4<f32> {
     var ray = raystart(screen_pos, rng);
-
-    let result1 = castray_impl(ray);
-    if result1.hit.hit && dot(result1.hit.normal, ray.direction) < 0.0 { // second ray
-
-        var color: vec4<f32> = result1.color;
-        var count = 1;
-        for (var i: u32 = 0; i < numBounceSamples; i = i + 1) {
-            let rand = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
-            let zz = result1.hit.p + result1.hit.normal + scattering * rand;
-            let newray = Ray(result1.hit.p, -normalize(result1.hit.p - zz));
-            let newresult = castray_impl(newray);
-            if newresult.hit.hit {
-                color += newresult.color;
-                count = count + 1;
-
-                let rand2 = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
-                let zz2 = newresult.hit.p + newresult.hit.normal + scattering * rand2;
-                let newray2 = Ray(newresult.hit.p, -normalize(newresult.hit.p - zz2));
-                let newresult2 = castray_impl(newray2);
-                if newresult2.hit.hit {
-                    color += newresult2.color;
-                    count = count + 1;
-                }
-            }
+    var throughput = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+    var bounces = numBounces;
+    loop {
+        if (bounces == 0u) {
+            return vec4<f32>(0.0);
         }
-        color /= f32(count);
+        bounces = bounces - 1u;
 
-        return color;
+        let hitResult = scene_hit(ray);
+        if (!hitResult.hit.hit) {
+            let background = vec4<f32>(137.0 / 255.0, 207.0 / 255.0, 240.0 / 255.0, 1.0);
+            return throughput * background;
+        }
+
+        let scatterRecord = scatter(hitResult, rng);
+        throughput = throughput * scatterRecord.attenuation;
+        ray = scatterRecord.scatteredRay;
     }
 
-    return result1.color;
+    return vec4<f32>(0.0);
 }
 
-fn castray_impl(ray: Ray) -> RayResult {
+fn scatter(hitResult: RayResult, rng: ptr<function, u32>) -> ScatterRecord {
+    let hit = hitResult.hit;
+    let material = hitResult.material;
 
+    let rand = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
+    let zz = hit.p + hit.normal + material.roughness * rand;
+    let newray = Ray(hit.p, -normalize(hit.p - zz));
+    return ScatterRecord(newray, 0.5);
+}
+
+fn scene_hit(ray: Ray) -> RayResult {
     var hit_anything = false;
     var closest = Hit(false, 9999999.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
-    var material = vec4<f32>(137.0 / 255.0, 207.0 / 255.0, 240.0 / 255.0, 1.0);
+    var material: Material;
 
     for (var i = 0u; i < arrayLength(&spheres); i++) {
-        let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.01, 1000.0);
+        let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.000001, 100000.0);
         if hit_sphere.hit {
             hit_anything = true;
             if hit_sphere.t < closest.t {
@@ -161,7 +170,6 @@ fn castray_impl(ray: Ray) -> RayResult {
 }
 
 fn raystart(screenPos: vec2<f32>, rng: ptr<function, u32>) -> Ray {
-
     let s = screenPos.x / details.screen_width;
     let t = screenPos.y / details.screen_height;
 

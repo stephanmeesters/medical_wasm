@@ -84,7 +84,7 @@ impl MeshPipeline {
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<ModelVertex>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Vertex,
@@ -105,7 +105,7 @@ impl MeshPipeline {
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_config.format,
                     blend: Some(wgpu::BlendState {
