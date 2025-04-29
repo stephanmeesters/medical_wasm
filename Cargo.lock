@@ -2183,12 +2183,14 @@ name = "wgpu_raycaster_new"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "cfg_aliases",
  "cgmath",
  "gltf",
  "instant",
  "pollster",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-sys",
  "wgpu",
  "winit",
 ]

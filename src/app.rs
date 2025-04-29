@@ -2,6 +2,7 @@ use std::sync::Arc;
 use pollster::FutureExt;
 
 use instant::Instant;
+#[cfg(not(web_platform))]
 use std::time::Duration;
 
 use winit::application::ApplicationHandler;
@@ -13,10 +14,10 @@ use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::renderer::Renderer;
 
-pub fn run() -> Result<(), impl std::error::Error> {
+pub async fn run() {
     let event_loop = EventLoop::new().unwrap();
     let mut app = MedicalApp::default();
-    event_loop.run_app(&mut app)
+    let _ = event_loop.run_app(&mut app);
 }
 
 #[derive(Default)]
@@ -35,7 +36,9 @@ impl ApplicationHandler for MedicalApp {
         let window_attributes = WindowAttributes::default().with_title(
             "Medical App (FPS: ?)",
         ).with_inner_size(PhysicalSize::new(1000, 1000));
+
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+
         self.window = Some(window.clone());
         self.renderer = Some(Renderer::new(window.clone()).block_on());
         self.last_update = Some(Instant::now());
@@ -75,11 +78,15 @@ impl ApplicationHandler for MedicalApp {
 
             renderer.update();
             let _ = renderer.render().await;
-            if let Some(last_update) = self.last_update {
-                if last_update.elapsed() > Duration::from_secs(1) {
-                    let fps = self.renderer.as_ref().unwrap().get_fps();
-                    window.set_title(&format!("Medical App (FPS: {})", fps));
-                    self.last_update = Some(Instant::now());
+
+            #[cfg(not(web_platform))]
+            {
+                if let Some(last_update) = self.last_update {
+                    if last_update.elapsed() > Duration::from_secs(1) {
+                        let fps = self.renderer.as_ref().unwrap().get_fps();
+                        window.set_title(&format!("Medical App (FPS: {})", fps));
+                        self.last_update = Some(Instant::now());
+                    }
                 }
             }
             window.request_redraw();
