@@ -14,7 +14,7 @@ use winit::window::{Window, WindowAttributes, WindowId};
 
 use crate::renderer::Renderer;
 
-pub async fn run() {
+pub fn run() {
     let event_loop = EventLoop::new().unwrap();
     let mut app = MedicalApp::default();
     let _ = event_loop.run_app(&mut app);
@@ -33,9 +33,16 @@ impl ApplicationHandler for MedicalApp {
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window_attributes = WindowAttributes::default().with_title(
+        #[allow(unused_mut)]
+        let mut window_attributes = WindowAttributes::default().with_title(
             "Medical App (FPS: ?)",
         ).with_inner_size(PhysicalSize::new(1000, 1000));
+
+        #[cfg(web_platform)]
+        {
+            use winit::platform::web::WindowAttributesExtWebSys;
+            window_attributes = window_attributes.with_append(true);
+        }
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
@@ -72,12 +79,12 @@ impl ApplicationHandler for MedicalApp {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        pollster::block_on(async {
+        // pollster::block_on(async {
             let renderer = self.renderer.as_mut().unwrap();
             let window = self.window.as_ref().unwrap();
 
             renderer.update();
-            let _ = renderer.render().await;
+            let _ = renderer.render();
 
             #[cfg(not(web_platform))]
             {
@@ -90,7 +97,7 @@ impl ApplicationHandler for MedicalApp {
                 }
             }
             window.request_redraw();
-        });
+        // });
 
         if self.close_requested {
             event_loop.exit();

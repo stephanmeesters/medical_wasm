@@ -1,20 +1,3 @@
-struct CameraUniform {
-    eye: vec3<f32>,
-    lens_radius: f32,
-    u_axis: vec3<f32>, // camera "right"
-    z_near: f32,
-    v_axis: vec3<f32>, // camera "up"
-    z_far: f32,
-    w_axis: vec3<f32>, // camera looks "backwards"
-    projection: u32,   // ortho: 0, projection: 1
-    horizontal: vec3<f32>,
-    _pad2: f32,
-    vertical: vec3<f32>,
-    _pad3: f32,
-    lower_left_corner: vec3<f32>,
-    _pad4: f32
-};
-
 struct Ray {
     start: vec3<f32>,
     direction: vec3<f32>,

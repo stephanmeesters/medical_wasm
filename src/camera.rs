@@ -66,7 +66,7 @@ pub struct Camera {
 #[derive(Clone)]
 pub enum Projection {
     Orthograpic = 0,
-    Perspective = 1
+    Perspective = 1,
 }
 
 impl Camera {
@@ -124,12 +124,18 @@ impl Camera {
     }
 
     pub fn update(&mut self, queue: &wgpu::Queue) {
-
         self.t += 0.01;
-        // self.eye = (-self.t.sin()*1.0 - 1.0, self.t.sin()*1.0 + 1.0, self.t.sin()*1.0 + 2.0).into();
+        // self.eye = (
+        //     -self.t.sin() * 1.0 - 1.0,
+        //     self.t.sin() * 1.0 + 1.0,
+        //     self.t.sin() * 1.0 + 2.0,
+        // )
+        // .into();
         // self.fovy = self.t.sin()*45.0 + 90.0;
-        self.focus_distance = self.t.sin()*0.5 + 3.5;
+        // self.focus_distance = self.t.sin()*0.5 + 3.5;
+        self.aperture = 0.0;
 
+        self.eye = (0.0, 0.0, self.t.sin() * 5.0 + 3.0).into();
 
         let theta = self.fovy.to_radians();
         let half_height = (theta * 0.5).tan();
@@ -141,8 +147,9 @@ impl Camera {
 
         let horizontal = 2.0 * half_width * self.focus_distance * u_axis;
         let vertical = 2.0 * half_height * self.focus_distance * v_axis;
-        let lower_left_corner = self.eye - (horizontal * 0.5) - (vertical * 0.5) - (self.focus_distance * w_axis);
-        
+        let lower_left_corner =
+            self.eye - (horizontal * 0.5) - (vertical * 0.5) - (self.focus_distance * w_axis);
+
         self.uniform.w_axis = w_axis.into();
         self.uniform.u_axis = u_axis.into();
         self.uniform.v_axis = v_axis.into();

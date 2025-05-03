@@ -38,15 +38,13 @@ impl Renderer {
             .expect("cant request adapter");
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: wgpu::MemoryHints::Performance,
-                    trace: wgpu::Trace::Off,
-                }
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                trace: wgpu::Trace::Off,
+            })
             .await
             .expect("cant create device");
 
@@ -75,7 +73,7 @@ impl Renderer {
 
         let camera = Camera::new(&device, &surface_config);
 
-        let pipelines = Pipelines::new(&surface_config, &device, &camera);
+        let pipelines = Pipelines::new(&surface_config, &device, &queue, &camera);
 
         let fpscounter = FPSCounter::new();
 
@@ -142,7 +140,7 @@ impl Renderer {
         depthbuffer_texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    pub async fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
         let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor {
             ..wgpu::TextureViewDescriptor::default()
@@ -160,7 +158,6 @@ impl Renderer {
             &self.multisample_framebuffer,
             &self.depthbuffer,
             &mut encoder,
-            
         );
 
         self.queue.submit(iter::once(encoder.finish()));
@@ -190,10 +187,14 @@ impl Renderer {
 
         self.multisample_framebuffer =
             Renderer::create_multisampled_framebuffer(&self.device, &self.surface_config, 4);
-        self.depthbuffer =
-            Renderer::create_depthbuffer(&self.device, &self.surface_config);
+        self.depthbuffer = Renderer::create_depthbuffer(&self.device, &self.surface_config);
 
         self.camera = Camera::new(&self.device, &self.surface_config);
-        self.pipelines = Pipelines::new(&self.surface_config, &self.device, &self.camera);
+        self.pipelines = Pipelines::new(
+            &self.surface_config,
+            &self.device,
+            &self.queue,
+            &self.camera,
+        );
     }
 }
