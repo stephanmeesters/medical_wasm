@@ -1,4 +1,5 @@
 use cgmath::InnerSpace;
+use gilrs::{Button, Event, EventType, Gilrs};
 use wgpu::util::DeviceExt;
 
 #[repr(C)]
@@ -60,6 +61,13 @@ pub struct Camera {
     pub bind_group_layout: wgpu::BindGroupLayout,
     pub rot: f32,
     pub t: f32,
+
+    pub gilrs: Gilrs,
+
+    pub dpaddown: bool,
+    pub dpadup: bool,
+    pub dpadleft: bool,
+    pub dpadright: bool,
 }
 
 #[repr(u32)]
@@ -71,6 +79,11 @@ pub enum Projection {
 
 impl Camera {
     pub fn new(device: &wgpu::Device, surface_config: &wgpu::SurfaceConfiguration) -> Self {
+        let gilrs = Gilrs::new().unwrap();
+        for (_id, gamepad) in gilrs.gamepads() {
+            println!("{} is {:?}", gamepad.name(), gamepad.power_info());
+        }
+
         let uniform = CameraUniform::default();
 
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -120,6 +133,12 @@ impl Camera {
             bind_group,
             bind_group_layout,
             t: 0.0,
+
+            gilrs,
+            dpaddown: false,
+            dpadup: false,
+            dpadleft: false,
+            dpadright: false,
         }
     }
 
@@ -135,7 +154,72 @@ impl Camera {
         // self.focus_distance = self.t.sin()*0.5 + 3.5;
         self.aperture = 0.0;
 
-        self.eye = (0.0, 0.0, self.t.sin() * 5.0 + 3.0).into();
+        // self.target = (0.0, 0.0, 0.0).into();
+        // self.eye = (0.5, 0.0, 0.0).into();
+        // self.eye = (0.0, 0.0, self.t.sin() * 5.0 + 3.0).into();
+        //
+
+        // let mut active_gamepad = None;
+        // while let Some(Event {
+        //     id, event, time, ..
+        // }) = self.gilrs.next_event()
+        // {
+        //     println!("{:?} New event from {}: {:?}", time, id, event);
+        //     active_gamepad = Some(id);
+        // }
+        //
+        // // You can also use cached gamepad state
+        // if let Some(gamepad) = active_gamepad.map(|id| self.gilrs.gamepad(id)) {
+        //     if gamepad.is_pressed(Button::DPadDown) {
+        //         self.dpaddown = true;
+        //     }
+        //     if gamepad.is_pressed(Button::DPadDown) {
+        //         self.dpaddown = true;
+        //     }
+        // }
+        //
+        while let Some(ev) = self.gilrs.next_event() {
+            match ev.event {
+                EventType::ButtonPressed(Button::DPadDown, _) => {
+                    self.dpaddown = true;
+                }
+                EventType::ButtonReleased(Button::DPadDown, _) => {
+                    self.dpaddown = false;
+                }
+                EventType::ButtonPressed(Button::DPadUp, _) => {
+                    self.dpadup = true;
+                }
+                EventType::ButtonReleased(Button::DPadUp, _) => {
+                    self.dpadup = false;
+                }
+                EventType::ButtonPressed(Button::DPadLeft, _) => {
+                    self.dpadleft = true;
+                }
+                EventType::ButtonReleased(Button::DPadLeft, _) => {
+                    self.dpadleft = false;
+                }
+                EventType::ButtonPressed(Button::DPadRight, _) => {
+                    self.dpadright = true;
+                }
+                EventType::ButtonReleased(Button::DPadRight, _) => {
+                    self.dpadright = false;
+                }
+                _ => {}
+            }
+        }
+
+        if self.dpaddown {
+            self.eye.y -= 0.005;
+        }
+        if self.dpadup {
+            self.eye.y += 0.005;
+        }
+        if self.dpadleft {
+            self.eye.x -= 0.005;
+        }
+        if self.dpadright {
+            self.eye.x += 0.005;
+        }
 
         let theta = self.fovy.to_radians();
         let half_height = (theta * 0.5).tan();

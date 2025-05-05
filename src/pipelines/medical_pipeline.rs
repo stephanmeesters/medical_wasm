@@ -1,6 +1,5 @@
 use crate::camera::Camera;
-use bytemuck::{cast_slice, Pod, Zeroable};
-use nifti::{IntoNdArray, NiftiObject, NiftiVolume, ReaderOptions};
+use nifti::{IntoNdArray, NiftiObject, ReaderOptions};
 use wgpu::util::DeviceExt;
 
 pub struct MedicalPipeline {
@@ -84,7 +83,13 @@ impl MedicalPipeline {
             },
         );
 
-        let details = vec![surface_config.width as f32, surface_config.height as f32];
+        let details = vec![
+            surface_config.width as f32,
+            surface_config.height as f32,
+            width as f32,
+            height as f32,
+            depth as f32,
+        ];
         let details_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("details buffer"),
             contents: bytemuck::cast_slice(&details),

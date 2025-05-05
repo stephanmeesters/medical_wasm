@@ -10,7 +10,10 @@ struct RayResult {
 
 struct Details {
     screen_width: f32,
-    screen_height: f32
+    screen_height: f32,
+    input_width: f32,
+    input_height: f32,
+    input_depth: f32
 }
 
 @group(0) @binding(0)
@@ -82,7 +85,10 @@ fn scene_hit(ray: Ray) -> RayResult {
     var max = -10000.0;
     for(var i = 0; i < 100; i++)
     {
-        let pos = ray.start + ray.direction * f32(i);
+        var pos = ray.start - ray.direction * f32(i) * 0.1;
+        pos.x /= details.input_width;
+        pos.y /= details.input_height;
+        pos.z /= details.input_depth;
         let sample:vec4<f32> = textureSampleLevel(input, input_sampler, pos, 0.0);
         if(sample.r > max)
         {

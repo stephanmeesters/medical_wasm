@@ -13,6 +13,7 @@ cfg_aliases = "0.2.1"
 [dependencies]
 bytemuck = { version = "1.22.0", features = ["derive", "min_const_generics"] }
 cgmath = "0.18.0"
+gilrs = "0.11.0"
 gltf = "1.4.1"
 instant = "0.1.13"
 nifti = { version = "0.16.0", features = ["ndarray_volumes"] }
