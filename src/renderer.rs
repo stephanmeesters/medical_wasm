@@ -172,6 +172,19 @@ impl Renderer {
         self.camera.update(&self.queue);
     }
 
+    // Mouse input forwarding to camera
+    pub fn mouse_motion(&mut self, dx: f32, dy: f32) {
+        self.camera.mouse_motion(dx, dy);
+    }
+
+    pub fn mouse_buttons(&mut self, right: bool, middle: bool) {
+        self.camera.mouse_buttons(right, middle);
+    }
+
+    pub fn mouse_wheel(&mut self, delta: f32) {
+        self.camera.mouse_wheel(delta);
+    }
+
     pub fn get_fps(&self) -> String {
         self.fpscounter.print()
     }

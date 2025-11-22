@@ -9,10 +9,25 @@ pub struct RaytracePipeline {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct Material {
+    // Matches WGSL: vec4<f32>
+    albedo: [f32; 4],
+    // Matches WGSL: vec4<f32>
+    emission: [f32; 4],
+    // Matches WGSL: f32, pad to 16-byte multiple (std430 rules)
+    roughness: f32,
+    _pad: [f32; 3],
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Sphere {
+    // Matches WGSL: vec3<f32>
     pos: [f32; 3],
+    // Matches WGSL: f32
     radius: f32,
-    material: [f32; 4] 
+    // Matches WGSL: Material
+    material: Material,
 }
 
 impl RaytracePipeline {
@@ -20,20 +35,48 @@ impl RaytracePipeline {
         self.texture.create_view(&Default::default())
     }
 
-    pub fn new(surface_config: &wgpu::SurfaceConfiguration,
-            device: &wgpu::Device,
-            camera: &Camera) -> Self {
-
+    pub fn new(
+        surface_config: &wgpu::SurfaceConfiguration,
+        device: &wgpu::Device,
+        camera: &Camera,
+    ) -> Self {
         let spheres = vec![
-            Sphere { pos: [-0.5, 0.0, -1.0], radius:0.5, material: [1.0, 0.0, 0.0, 1.0]},
-            Sphere { pos: [0.5, 0.0, 0.0], radius:0.5, material: [0.0, 0.0, 1.0, 1.0]},
-            Sphere { pos: [0.0, -25.5, -1.0], radius:25.0, material: [1.0, 1.0, 1.0, 1.0]},
+            Sphere {
+                pos: [0.2, 0.0, 0.0],
+                radius: 0.3,
+                material: Material {
+                    albedo: [1.0, 0.0, 0.0, 1.0],
+                    emission: [0.0, 0.0, 0.0, 0.0],
+                    roughness: 0.0,
+                    _pad: [0.0; 3],
+                },
+            },
+            Sphere {
+                pos: [1.0, 0.0, 0.0],
+                radius: 0.5,
+                material: Material {
+                    albedo: [0.0, 0.0, 1.0, 1.0],
+                    emission: [0.0, 0.0, 0.0, 0.0],
+                    roughness: 0.0,
+                    _pad: [0.0; 3],
+                },
+            },
+            Sphere {
+                pos: [0.0, -25.5, -1.0],
+                radius: 25.0,
+                material: Material {
+                    albedo: [0.0, 1.0, 0.0, 1.0],
+                    emission: [0.0, 0.0, 0.0, 0.0],
+                    roughness: 0.0,
+                    _pad: [0.0; 3],
+                },
+            },
         ];
 
         let spheres_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Spheres Buffer"),
             contents: bytemuck::cast_slice(&spheres),
-            usage: wgpu::BufferUsages::STORAGE
+            usage: wgpu::BufferUsages::STORAGE,
         });
 
         let details = vec![surface_config.width as f32, surface_config.height as f32];
@@ -43,15 +86,23 @@ impl RaytracePipeline {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        ////
+        //
+        //
+        //
 
-        let shader_common_src = include_str!("shaders/common.wgsl");
-        let shader_raytracing_src = include_str!("shaders/raytrace.wgsl");
-        let shader_combined = format!("{}\n{}", shader_common_src, shader_raytracing_src);
+// let shader_string = wesl::Wesl::new("src/pipelines/shaders")
+//     .compile(&"package::raytrace".parse().unwrap())
+//     .inspect_err(|e| eprintln!("WESL error: {e}")) // pretty errors with `display()`
+//     .unwrap()
+//     .to_string();
+
+        // let shader_common_src = include_str!("shaders/common.wgsl");
+        let shader_string = include_str!("shaders/raytrace.wgsl");
+        // let shader_combined = format!("{}\n{}", shader_common_src, shader_raytracing_src);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),
-            source: wgpu::ShaderSource::Wgsl(shader_combined.into()),
+            source: wgpu::ShaderSource::Wgsl(shader_string.into()),
         });
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -76,67 +127,70 @@ impl RaytracePipeline {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("ray bind group layout"),
             entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::StorageTexture {
-                    access: wgpu::StorageTextureAccess::WriteOnly,
-                    format: texture.format(),
-                    view_dimension: wgpu::TextureViewDimension::D2,
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: texture.format(),
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
+                    count: None,
                 },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }]
+            ],
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&texture_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: camera.buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: spheres_buffer.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: details_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: camera.buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: spheres_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: details_buffer.as_entire_binding(),
+                },
+            ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -157,7 +211,7 @@ impl RaytracePipeline {
         Self {
             pipeline,
             bind_group,
-            texture
+            texture,
         }
     }
 
@@ -169,6 +223,10 @@ impl RaytracePipeline {
 
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_bind_group(0, &self.bind_group, &[]);
-        compute_pass.dispatch_workgroups((self.texture.width() + 7) / 8, (self.texture.height() + 7) / 8, 1);
+        compute_pass.dispatch_workgroups(
+            (self.texture.width() + 7) / 8,
+            (self.texture.height() + 7) / 8,
+            1,
+        );
     }
 }

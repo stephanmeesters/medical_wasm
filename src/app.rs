@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::{ElementState, KeyEvent, StartCause, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::Key;
 use winit::window::{Window, WindowAttributes, WindowId};
@@ -25,7 +25,11 @@ struct MedicalApp {
     close_requested: bool,
     last_update: Option<Instant>,
     window: Option<Arc<Window>>,
-    renderer: Option<Renderer>
+    renderer: Option<Renderer>,
+    last_cursor_pos: Option<(f64, f64)>,
+    mouse_left_down: bool,
+    mouse_right_down: bool,
+    mouse_middle_down: bool,
 }
 
 impl ApplicationHandler for MedicalApp {
@@ -61,6 +65,47 @@ impl ApplicationHandler for MedicalApp {
             WindowEvent::CloseRequested => {
                 self.close_requested = true;
             },
+            WindowEvent::MouseInput { state, button, .. } => {
+                let pressed = state == ElementState::Pressed;
+                match button {
+                    MouseButton::Left => {
+                        self.mouse_left_down = pressed;
+                    }
+                    MouseButton::Right => {
+                        self.mouse_right_down = pressed;
+                    }
+                    MouseButton::Middle => {
+                        self.mouse_middle_down = pressed;
+                    }
+                    _ => {}
+                }
+                if let Some(renderer) = self.renderer.as_mut() {
+                    // Treat either Left or Right as the "look" button
+                    let look_down = self.mouse_right_down || self.mouse_left_down;
+                    renderer.mouse_buttons(look_down, self.mouse_middle_down);
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                let (x, y) = (position.x, position.y);
+                if let Some((px, py)) = self.last_cursor_pos {
+                    let dx = (x - px) as f32;
+                    let dy = (y - py) as f32;
+                    if let Some(renderer) = self.renderer.as_mut() {
+                        renderer.mouse_motion(dx, dy);
+                    }
+                }
+                self.last_cursor_pos = Some((x, y));
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let mut y = 0.0f32;
+                match delta {
+                    MouseScrollDelta::LineDelta(_, ly) => y = ly as f32,
+                    MouseScrollDelta::PixelDelta(pos) => y = pos.y as f32,
+                }
+                if let Some(renderer) = self.renderer.as_mut() {
+                    renderer.mouse_wheel(y);
+                }
+            }
             WindowEvent::KeyboardInput {
                 event: KeyEvent { logical_key: key, state: ElementState::Pressed, .. },
                 ..
