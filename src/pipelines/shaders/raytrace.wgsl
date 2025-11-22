@@ -1,75 +1,3 @@
-fn hash22(p: vec2<f32>) -> vec2<f32> {
-    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.xx + p3.yz) * p3.zy);
-}
-
-fn hash32(p: vec2<f32>) -> vec3<f32> {
-    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yxz + 33.33);
-    return fract((p3.xxy + p3.yzz) * p3.zyx);
-}
-
-fn hash33(p: vec3<f32>) -> vec3<f32> {
-    var p3 = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yxz + 33.33);
-    return fract((p3.xxy + p3.yxx) * p3.zyx);
-}
-
-fn rand_f(state: ptr<function, u32>) -> f32 {
-    *state = *state * 747796405u + 2891336453u;
-    let word = ((*state >> ((*state >> 28u) + 4u)) ^ *state) * 277803737u;
-    return f32((word >> 22u) ^ word) * bitcast<f32>(0x2f800004u);
-}
-
-fn rand_vec2f(state: ptr<function, u32>) -> vec2<f32> {
-    return vec2(rand_f(state), rand_f(state));
-}
-
-fn rand_vec3f(state: ptr<function, u32>) -> vec3<f32> {
-    return vec3(rand_f(state), rand_f(state), rand_f(state));
-}
-
-fn get_rand_vector_aligned(p: vec3<f32>, i: u32) -> vec3<f32> {
-    let offset = vec3<f32>(i);
-    let sample = hash33(p + offset);
-    if dot(p, sample) > 0.0 {
-        return sample;
-    }
-    return -sample;
-}
-
-fn computeBarycentricCoords(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>) -> vec3<f32> {
-    let v0 = b - a;
-    let v1 = c - a;
-    let v2 = p - a;
-    let d00 = dot(v0, v0);
-    let d01 = dot(v0, v1);
-    let d11 = dot(v1, v1);
-    let d20 = dot(v2, v0);
-    let d21 = dot(v2, v1);
-    let denom = d00 * d11 - d01 * d01;
-    let v = (d11 * d20 - d01 * d21) / denom;
-    let w = (d00 * d21 - d01 * d20) / denom;
-    let u = 1.0 - v - w;
-    return vec3<f32>(u, v, w);
-}
-
-fn linear_to_gamma(c: vec4<f32>) -> vec4<f32> {
-    return vec4<f32>(
-        linear_to_gamma_comp(c.r),
-        linear_to_gamma_comp(c.g),
-        linear_to_gamma_comp(c.b),
-        c.a);
-}
-
-fn linear_to_gamma_comp(c: f32) -> f32 {
-    if c <= 0.0 {
-        return 0.0;
-    }
-    return sqrt(c);
-}
-
 struct CameraUniform {
     eye: vec3<f32>,
     lens_radius: f32,
@@ -140,10 +68,11 @@ var<uniform> details: Details;
 
 var<workgroup> counter: atomic<u32>;
 
-const numSamples: u32 = 10;
+const PI: f32 = 3.14159265358;
+const numSamples: u32 = 10u;
 const useAA: bool = true;
-const numBounceSamples: u32 = 10;
-const numBounces: u32 = 3;
+const numBounceSamples: u32 = 10u;
+const numBounces: u32 = 3u;
 const scattering: f32 = 0.0;
 
 ////
@@ -157,14 +86,15 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     if screen_pos_u32.x >= screen_size.x || screen_pos_u32.y >= screen_size.y {
         return;
     }
-    
-    var color = castray(vec2<f32>(screen_pos_u32));
+
+    counter = counter + 1;
+    var rng = screen_pos_u32.x + screen_pos_u32.y * 1000u + counter * 5782582u;
+
+    var color = castray(vec2<f32>(screen_pos_u32), &rng);
 //    color = linear_to_gamma(color);
     let screen_pos_i32 = vec2<i32>(screen_pos_u32);
     textureStore(color_buffer, screen_pos_i32, color);
 
-    // counter = counter + 1;
-    // var rng = screen_pos_u32.x + screen_pos_u32.y * 1000u + counter * 5782582u;
     //
     // var color: vec4<f32>;
     // if useAA {
@@ -186,23 +116,30 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID: vec3<u32>) {
     // let screen_pos_i32 = vec2<i32>(screen_pos_u32);
     // textureStore(color_buffer, screen_pos_i32, color);
 }
-//
-fn castray(screen_pos: vec2<f32>) -> vec4<f32> {
-  var ray = raydet(screen_pos);
-  var color = vec4<f32>(1.0);
-  let hit = scene_hit(ray);
-  if hit.hit.hit {
-    color *= hit.material.albedo;
-//    color *= 0.0;
-  }
-  return color;
+
+fn castray(screen_pos: vec2<f32>, rng: ptr<function, u32>) -> vec4<f32> {
+    var ray = create_ray(screen_pos);
+    var color = vec4<f32>(1.0);
+    let rayResult = scene_hit(ray);
+    if rayResult.hit.hit {
+        let costheta = max(0.0, dot(rayResult.hit.normal, -ray.direction));
+        color *= brdf_lambertian(-ray.direction, rayResult.hit.normal, rayResult.material) * costheta;
+
+        let scat = scatter(rayResult, rng);
+        let rayResult2 = scene_hit(scat.scatteredRay);
+        if rayResult2.hit.hit {
+            let costheta2 = max(0.0, dot(rayResult2.hit.normal, scat.scatteredRay.direction));
+            color *= brdf_lambertian(scat.scatteredRay.direction, rayResult2.hit.normal, rayResult2.material) * costheta2;
+        }
+    }
+    return color;
 }
 
-fn raydet(screenPos: vec2<f32>) -> Ray {
+fn create_ray(screenPos: vec2<f32>) -> Ray {
     let s = screenPos.x / details.screen_width;
     let t = screenPos.y / details.screen_height;
 
-    if camera.projection == 0 {
+    if camera.projection == 0u {
         let origin = camera.lower_left_corner + s * camera.horizontal + t * camera.vertical;
         let direction = normalize(-camera.w_axis);
         return Ray(origin, direction);
@@ -214,29 +151,47 @@ fn raydet(screenPos: vec2<f32>) -> Ray {
     }
 }
 
- fn scene_hit(ray: Ray) -> RayResult {
-     var hit_anything = false;
-     var closest = Hit(false, 9999999.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
-     var material: Material;
+fn scene_hit(ray: Ray) -> RayResult {
+    var hit_anything = false;
+    var closest = Hit(false, 9999999.0, vec3<f32>(0.0), vec3<f32>(0.0), vec3<f32>(0.0));
+    var material: Material;
 
-     for (var i = 0u; i < arrayLength(&spheres); i++) {
-         let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.000001, 100000.0);
-         if hit_sphere.hit {
-             hit_anything = true;
-             if hit_sphere.t < closest.t {
-                 closest = hit_sphere;
-                 material = spheres[i].material;
-             }
-         }
-     }
+    for (var i = 0u; i < arrayLength(&spheres); i++) {
+        let hit_sphere = hit_sphere(spheres[i].pos, spheres[i].radius, ray, 0.000001, 100000.0);
+        if hit_sphere.hit {
+            hit_anything = true;
+            if hit_sphere.t < closest.t {
+                closest = hit_sphere;
+                material = spheres[i].material;
+            }
+        }
+    }
 
-     if hit_anything {
-         let color = material;
-         return RayResult(color, closest);
-     }
+    if hit_anything {
+        let color = material;
+        return RayResult(color, closest);
+    }
 
-     return RayResult(material, closest);
- }
+    return RayResult(material, closest);
+}
+
+fn brdf_lambertian(w_in: vec3<f32>, normal: vec3<f32>, material: Material) -> vec4<f32> {
+    let cosin = dot(normal, w_in);
+    if cosin <= 0.0 {
+        return vec4<f32>(0.0);
+    }
+    return material.albedo / PI;
+}
+
+fn scatter(hitResult: RayResult, rng: ptr<function, u32>) -> ScatterRecord {
+    let hit = hitResult.hit;
+    let material = hitResult.material;
+
+    let rand = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
+    let zz = hit.p + hit.normal + material.roughness * rand;
+    let newray = Ray(hit.p, -normalize(hit.p - zz));
+    return ScatterRecord(newray, 0.5);
+}
 
 // fn castray(screen_pos: vec2<f32>, rng: ptr<function, u32>) -> vec4<f32> {
 //     var ray = raystart(screen_pos, rng);
@@ -262,15 +217,6 @@ fn raydet(screenPos: vec2<f32>) -> Ray {
 //     return vec4<f32>(0.0);
 // }
 //
-// fn scatter(hitResult: RayResult, rng: ptr<function, u32>) -> ScatterRecord {
-//     let hit = hitResult.hit;
-//     let material = hitResult.material;
-//
-//     let rand = normalize(rand_vec3f(rng) - vec3<f32>(0.5));
-//     let zz = hit.p + hit.normal + material.roughness * rand;
-//     let newray = Ray(hit.p, -normalize(hit.p - zz));
-//     return ScatterRecord(newray, 0.5);
-// }
 //
 // fn scene_hit(ray: Ray) -> RayResult {
 //     var hit_anything = false;
@@ -300,7 +246,7 @@ fn raystart(screenPos: vec2<f32>, rng: ptr<function, u32>) -> Ray {
     let s = screenPos.x / details.screen_width;
     let t = screenPos.y / details.screen_height;
 
-    if camera.projection == 0 {
+    if camera.projection == 0u {
         let origin = camera.lower_left_corner + s * camera.horizontal + t * camera.vertical;
         let direction = normalize(-camera.w_axis);
         return Ray(origin, direction);
@@ -368,5 +314,78 @@ fn intersectTriangle(ray: Ray, v0: vec3<f32>, v1: vec3<f32>, v2: vec3<f32>) -> f
     } else {
         return -1.0; // No valid intersection
     }
+}
+
+fn hash22(p: vec2<f32>) -> vec2<f32> {
+    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+fn hash32(p: vec2<f32>) -> vec3<f32> {
+    var p3 = fract(vec3<f32>(p.xyx) * vec3<f32>(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return fract((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+fn hash33(p: vec3<f32>) -> vec3<f32> {
+    var p3 = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yxz + 33.33);
+    return fract((p3.xxy + p3.yxx) * p3.zyx);
+}
+
+fn rand_f(state: ptr<function, u32>) -> f32 {
+    *state = *state * 747796405u + 2891336453u;
+    let word = ((*state >> ((*state >> 28u) + 4u)) ^ *state) * 277803737u;
+    return f32((word >> 22u) ^ word) * bitcast<f32>(0x2f800004u);
+}
+
+fn rand_vec2f(state: ptr<function, u32>) -> vec2<f32> {
+    return vec2(rand_f(state), rand_f(state));
+}
+
+fn rand_vec3f(state: ptr<function, u32>) -> vec3<f32> {
+    return vec3(rand_f(state), rand_f(state), rand_f(state));
+}
+
+fn get_rand_vector_aligned(p: vec3<f32>, i: u32) -> vec3<f32> {
+    let offset = vec3<f32>(i);
+    let sample = hash33(p + offset);
+    if dot(p, sample) > 0.0 {
+        return sample;
+    }
+    return -sample;
+}
+
+fn computeBarycentricCoords(p: vec3<f32>, a: vec3<f32>, b: vec3<f32>, c: vec3<f32>) -> vec3<f32> {
+    let v0 = b - a;
+    let v1 = c - a;
+    let v2 = p - a;
+    let d00 = dot(v0, v0);
+    let d01 = dot(v0, v1);
+    let d11 = dot(v1, v1);
+    let d20 = dot(v2, v0);
+    let d21 = dot(v2, v1);
+    let denom = d00 * d11 - d01 * d01;
+    let v = (d11 * d20 - d01 * d21) / denom;
+    let w = (d00 * d21 - d01 * d20) / denom;
+    let u = 1.0 - v - w;
+    return vec3<f32>(u, v, w);
+}
+
+fn linear_to_gamma(c: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>(
+        linear_to_gamma_comp(c.r),
+        linear_to_gamma_comp(c.g),
+        linear_to_gamma_comp(c.b),
+        c.a
+    );
+}
+
+fn linear_to_gamma_comp(c: f32) -> f32 {
+    if c <= 0.0 {
+        return 0.0;
+    }
+    return sqrt(c);
 }
 
