@@ -10,11 +10,8 @@ pub struct RaytracePipeline {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Material {
-    // Matches WGSL: vec4<f32>
     albedo: [f32; 4],
-    // Matches WGSL: vec4<f32>
     emission: [f32; 4],
-    // Matches WGSL: f32, pad to 16-byte multiple (std430 rules)
     roughness: f32,
     _pad: [f32; 3],
 }
@@ -22,11 +19,8 @@ struct Material {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Sphere {
-    // Matches WGSL: vec3<f32>
     pos: [f32; 3],
-    // Matches WGSL: f32
     radius: f32,
-    // Matches WGSL: Material
     material: Material,
 }
 
@@ -86,19 +80,7 @@ impl RaytracePipeline {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        //
-        //
-        //
-
-// let shader_string = wesl::Wesl::new("src/pipelines/shaders")
-//     .compile(&"package::raytrace".parse().unwrap())
-//     .inspect_err(|e| eprintln!("WESL error: {e}")) // pretty errors with `display()`
-//     .unwrap()
-//     .to_string();
-
-        // let shader_common_src = include_str!("shaders/common.wgsl");
         let shader_string = include_str!("shaders/raytrace.wgsl");
-        // let shader_combined = format!("{}\n{}", shader_common_src, shader_raytracing_src);
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Shader_ray"),

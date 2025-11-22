@@ -18,7 +18,6 @@ gltf = "1.4.1"
 instant = "0.1.13"
 nifti = { version = "0.16.0", features = ["ndarray_volumes"] }
 pollster = "0.4.0"
-wesl = "0.2.0"
 wgpu = "25.0.0"
 winit = "0.30.9"
 

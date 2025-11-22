@@ -124,28 +124,31 @@ impl ApplicationHandler for MedicalApp {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        // pollster::block_on(async {
-            let renderer = self.renderer.as_mut().unwrap();
-            let window = self.window.as_ref().unwrap();
+        // Exit early and drop GPU resources cleanly
+        if self.close_requested {
+            // Explicitly drop renderer and window before exiting
+            self.renderer = None;
+            self.window = None;
+            event_loop.exit();
+            return;
+        }
 
-            renderer.update();
-            let _ = renderer.render();
+        let renderer = self.renderer.as_mut().unwrap();
+        let window = self.window.as_ref().unwrap();
 
-            #[cfg(not(web_platform))]
-            {
-                if let Some(last_update) = self.last_update {
-                    if last_update.elapsed() > Duration::from_secs(1) {
-                        let fps = self.renderer.as_ref().unwrap().get_fps();
-                        window.set_title(&format!("Medical App (FPS: {})", fps));
-                        self.last_update = Some(Instant::now());
-                    }
+        renderer.update();
+        let _ = renderer.render();
+
+        #[cfg(not(web_platform))]
+        {
+            if let Some(last_update) = self.last_update {
+                if last_update.elapsed() > Duration::from_secs(1) {
+                    let fps = self.renderer.as_ref().unwrap().get_fps();
+                    window.set_title(&format!("Medical App (FPS: {})", fps));
+                    self.last_update = Some(Instant::now());
                 }
             }
-            window.request_redraw();
-        // });
-
-        if self.close_requested {
-            event_loop.exit();
         }
+        window.request_redraw();
     }
 }
